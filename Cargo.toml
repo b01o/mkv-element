@@ -1,0 +1,15 @@
+[package]
+name = "mkv-element"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+hexf = "0.2.1"
+
+[dev-dependencies]
+roxmltree = "0.20.0"
+
+[build-dependencies]
+roxmltree = "0.20.0"
+hexf = "0.2.1"
