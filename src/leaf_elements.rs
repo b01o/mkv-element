@@ -1,3 +1,4 @@
+#![allow(clippy::doc_lazy_continuation)] // auto-generated docs may have lazy continuation
 use std::ops::Deref;
 
 /// Bottom type for *unsigned integers*.
@@ -63,6 +64,3 @@ impl<const ID: u64> Deref for Bin<ID> {
 
 // Auto-generated element types.
 include!(concat!(env!("OUT_DIR"), "/generated_types.rs"));
-
-
-

@@ -1,7 +1,6 @@
-use crate::functional::*;
 use crate::base_type::*;
 use crate::error::Error;
-use crate::io::ReadElement;
+use crate::functional::*;
 use crate::io::ReadFrom;
 
 /// A Matroska element.
@@ -25,35 +24,12 @@ impl<T: Element> Decode for T {
             Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
             Err(e) => return Err(e),
         };
-        
+
         if body.has_remaining() {
             return Err(Error::UnderDecode(Self::ID));
         }
 
         buf.advance(body_size);
-        Ok(element)
-    }
-}
-
-impl<T: Element> DecodeElement for T {
-    fn decode_element(header: &Header, buf: &mut &[u8]) -> crate::Result<Self> {
-        let size = *header.size as usize;
-        if size > buf.remaining() {
-            return Err(crate::error::Error::OutOfBounds);
-        }
-        let mut body =  buf.slice(size);
-        let element = match T::decode_body(&mut body) {
-            Ok(e) => e,
-            Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),
-            Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
-            Err(e) => return Err(e),
-        };
-
-        if body.has_remaining() {
-            return Err(Error::UnderDecode(Self::ID));
-        }
-
-        buf.advance(size);
         Ok(element)
     }
 }
@@ -85,11 +61,3 @@ impl<T: Element> ReadFrom for T {
         Ok(element)
     }
 }
-
-impl<T: Element> ReadElement for T {
-    fn read_element<R: std::io::Read>(header: &Header, r: &mut R) -> crate::Result<Self> {
-        let body = header.read_body(r)?;
-        T::decode_body(&mut &body[..])
-    }
-}
-

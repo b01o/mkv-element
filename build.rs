@@ -28,7 +28,10 @@ fn main() {
             other => panic!("Unknown type: {other}"),
         };
         let default_value = element.attribute("default");
-        let documentation = element.children().find(|n| n.has_tag_name("documentation")).and_then(|n| n.text());
+        let documentation = element
+            .children()
+            .find(|n| n.has_tag_name("documentation"))
+            .and_then(|n| n.text());
 
         if let Some(doc) = documentation {
             for line in doc.lines() {
@@ -42,13 +45,25 @@ fn main() {
         if let Some(default) = default_value {
             writeln!(file, "/// Default value for the element if not present.").unwrap();
             if ty == "Float" {
-                writeln!(file, "    pub const DEFAULT: Option<{rep_ty}> = Some(hexf::hexf64!(\"{default}\"));").unwrap();
+                writeln!(
+                    file,
+                    "    pub const DEFAULT: Option<{rep_ty}> = Some(hexf::hexf64!(\"{default}\"));"
+                )
+                .unwrap();
             } else if ty == "Text" {
-                writeln!(file, "    pub const DEFAULT: Option<{rep_ty}> = Some(\"{default}\");").unwrap();
+                writeln!(
+                    file,
+                    "    pub const DEFAULT: Option<{rep_ty}> = Some(\"{default}\");"
+                )
+                .unwrap();
             } else {
-                writeln!(file, "    pub const DEFAULT: Option<{rep_ty}> = Some({default});").unwrap();
+                writeln!(
+                    file,
+                    "    pub const DEFAULT: Option<{rep_ty}> = Some({default});"
+                )
+                .unwrap();
             }
-        }else {
+        } else {
             writeln!(file, "/// Does not have a default value").unwrap();
             writeln!(file, "    pub const DEFAULT: Option<{rep_ty}> = None;").unwrap();
         }

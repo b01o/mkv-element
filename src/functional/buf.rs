@@ -1,7 +1,7 @@
 use std::ops::RangeBounds;
 
 /// A contiguous buffer of bytes.
-pub trait Buf: std::fmt::Debug {
+pub(crate) trait Buf: std::fmt::Debug {
     fn remaining(&self) -> usize;
     fn slice(&self, size: usize) -> &[u8];
     fn advance(&mut self, n: usize);

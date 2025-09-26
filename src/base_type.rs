@@ -1,5 +1,5 @@
-use crate::functional::*;
 use crate::error::Error;
+use crate::functional::*;
 use crate::io::ReadExt;
 use crate::io::ReadFrom;
 use std::fmt::Display;
@@ -43,7 +43,7 @@ impl Deref for VInt64 {
 impl VInt64 {
     /// Create a VInt64 from an already encoded u64 value.
     pub const fn from_encoded(enc: u64) -> Self {
-        Self(enc & (u64::MAX >> enc.leading_zeros() + 1))
+        Self(enc & (u64::MAX >> (enc.leading_zeros() + 1)))
     }
 
     /// Create a VInt64 from an already encoded u64 value.
@@ -63,7 +63,7 @@ impl VInt64 {
         if total_bits == 0 {
             1
         } else {
-            (total_bits + 6) / 7
+            (total_bits + 6).div_euclid(7)
         }
     }
 }
@@ -228,9 +228,7 @@ mod tests {
             assert_eq!(*v, val);
         }
     }
-
 }
-
 
 /// EBML element header, consisting of an ID and a size.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

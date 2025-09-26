@@ -1,11 +1,7 @@
 use core::slice;
 
 use super::*;
-use crate::{
-    Result,
-    base_type::{Header},
-    error::Error,
-};
+use crate::{Result, base_type::Header, element::Element, error::Error};
 
 /// Decode a type from a buffer.
 pub trait Decode: Sized {
@@ -28,9 +24,31 @@ pub trait Decode: Sized {
 }
 
 /// Decode an element using the provided header
-pub trait DecodeElement: Sized {
-    fn decode_element(header: &Header, buf: &mut &[u8]) -> Result<Self>;
+pub trait DecodeElement: Sized + Element {
+    /// Decode an element using the provided header
+    /// implemented for all `Element`s.
+    fn decode_element(header: &Header, buf: &mut &[u8]) -> Result<Self> {
+        let size = *header.size as usize;
+        if size > buf.remaining() {
+            return Err(crate::error::Error::OutOfBounds);
+        }
+        let mut body = buf.slice(size);
+        let element = match Self::decode_body(&mut body) {
+            Ok(e) => e,
+            Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),
+            Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
+            Err(e) => return Err(e),
+        };
+
+        if body.has_remaining() {
+            return Err(Error::UnderDecode(Self::ID));
+        }
+
+        buf.advance(size);
+        Ok(element)
+    }
 }
+impl<T: Element> DecodeElement for T {}
 
 impl<const N: usize> Decode for [u8; N] {
     fn decode(buf: &mut &[u8]) -> Result<Self> {
@@ -106,7 +124,7 @@ impl<T: Decode> Decode for Vec<T> {
 impl<T: Decode> Decode for Option<T> {
     /// # Safety:
     /// The buffer is not modified during decoding, as we holding a immutable reference to it.
-    /// 
+    ///
     fn decode(buf: &mut &[u8]) -> Result<Self> {
         if !buf.has_remaining() {
             return Ok(None);
@@ -123,31 +141,9 @@ impl<T: Decode> Decode for Option<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::base_type::VInt64;
-    use crate::functional::Decode;
-
-    // if decode fails, buf should be unchanged
-    #[test]
-    fn test_option_decode() {
-        let v = VInt64(42);
-        let mut encoded = vec![];
-        v.encode(&mut encoded).unwrap();
-        let mut slice_encoded = &encoded[..];
-
-        let opt_header = Option::<Header>::decode(&mut slice_encoded);
-
-        assert!(opt_header.is_err());
-        assert_ne!(slice_encoded.len(), 0);
-
-        let opt_vint = VInt64::decode(&mut slice_encoded).unwrap();
-        assert_eq!(opt_vint, v);
-    }
-}
-
+/// Encode an element to a buffer.
 pub trait Encode {
+    /// Encode self to the buffer.
     fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()>;
 }
 
@@ -240,5 +236,29 @@ impl<T: Encode> Encode for Vec<T> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::base_type::VInt64;
+    use crate::functional::Decode;
+
+    // if decode fails, buf should be unchanged
+    #[test]
+    fn test_option_decode() {
+        let v = VInt64(42);
+        let mut encoded = vec![];
+        v.encode(&mut encoded).unwrap();
+        let mut slice_encoded = &encoded[..];
+
+        let opt_header = Option::<Header>::decode(&mut slice_encoded);
+
+        assert!(opt_header.is_err());
+        assert_ne!(slice_encoded.len(), 0);
+
+        let opt_vint = VInt64::decode(&mut slice_encoded).unwrap();
+        assert_eq!(opt_vint, v);
     }
 }
