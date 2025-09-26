@@ -1,4 +1,4 @@
-use crate::base_type::VInt64;
+use crate::base::VInt64;
 
 /// Error types for this crate.
 #[derive(Debug, thiserror::Error)]

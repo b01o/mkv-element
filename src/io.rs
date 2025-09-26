@@ -1,5 +1,5 @@
 use super::*;
-use crate::{base_type::Header, element::Element, functional::Encode};
+use crate::{base::Header, element::Element, functional::Encode};
 use std::io::{Read, Write};
 
 /// Read a type from a reader.

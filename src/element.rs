@@ -1,4 +1,4 @@
-use crate::base_type::*;
+use crate::base::*;
 use crate::error::Error;
 use crate::functional::*;
 use crate::io::ReadFrom;

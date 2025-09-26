@@ -7,11 +7,11 @@ pub use functional::coding;
 mod error;
 pub use error::*;
 
-/// Variable-length integer types and utilities.
-pub mod base_type;
+/// base types for Matroska elements. ie. `VInt64`, `Header`, etc.
+pub mod base;
 /// I/O utilities.
 pub mod io;
-/// Leaf types for Matroska elements. ie. types except `Master` elements.
-pub mod leaf_elements;
+/// Leaf elements in Matroska.
+pub mod leaf;
 
 mod element;

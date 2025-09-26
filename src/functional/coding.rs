@@ -2,11 +2,11 @@
 use core::slice;
 
 use super::*;
-use crate::{Result, base_type::Header, element::Element, error::Error};
+use crate::{Result, base::Header, element::Element, error::Error};
 
-/// Decode a type from a buffer.
+/// Decode an element from a buffer.
 pub trait Decode: Sized {
-    /// Decode the type from the buffer.
+    /// Decode an element from the buffer.
     fn decode(buf: &mut &[u8]) -> Result<Self>;
 
     /// Helper: Decode exactly size bytes from the buffer.
@@ -243,7 +243,7 @@ impl<T: Encode> Encode for Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base_type::VInt64;
+    use crate::base::VInt64;
     use crate::functional::Decode;
 
     // if decode fails, buf should be unchanged
