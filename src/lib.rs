@@ -2,7 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 mod functional;
-pub use functional::coding::*;
+pub use functional::coding;
 /// Error types for this crate.
 mod error;
 pub use error::*;

@@ -35,7 +35,12 @@ fn main() {
 
         if let Some(doc) = documentation {
             for line in doc.lines() {
-                writeln!(file, "/// {}", line.trim()).unwrap();
+                writeln!(
+                    file,
+                    "/// {}",
+                    line.trim().replace("[", "\\[").replace("]", "\\]")
+                )
+                .unwrap();
             }
         } else {
             writeln!(file, "/// {name} in ebml").unwrap();

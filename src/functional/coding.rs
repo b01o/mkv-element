@@ -1,3 +1,4 @@
+//! Encoding and decoding Element or other types from buffers in memory.
 use core::slice;
 
 use super::*;
