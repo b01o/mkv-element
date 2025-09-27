@@ -26,6 +26,19 @@ pub enum Error {
     /// Not all bytes were consumed in a element body during element body decoding.
     #[error("Element body under decode, ID: {0}")]
     UnderDecode(VInt64),
+
+    /// Missing element.
+    #[error("Missing element, ID: {0}")]
+    MissingElement(VInt64),
+
+    /// Duplicate element in a master element.
+    #[error("Duplicate element {id} in master element {parent}")]
+    DuplicateElement {
+        /// The duplicate element ID.
+        id: VInt64,
+        /// The parent master element ID.
+        parent: VInt64,
+    },
 }
 
 /// Result type for this crate.

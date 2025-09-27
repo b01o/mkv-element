@@ -11,7 +11,14 @@ pub use error::*;
 pub mod base;
 /// I/O utilities.
 pub mod io;
+
 /// Leaf elements in Matroska.
 pub mod leaf;
+/// Master elements in Matroska.
+pub mod master;
+/// Supplementary elements in Matroska. Void elements, CRC-32, etc.
+///
+/// These elements are not from the official Matroska specification, but are commonly used in practice.
+pub mod supplement;
 
 mod element;
