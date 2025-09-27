@@ -3,11 +3,20 @@ use std::ops::Deref;
 
 mod uint {
     #![allow(dead_code)]
+    use std::ops::Deref;
+
     use crate::{base::VInt64, element::Element, functional::Buf};
 
     /// Bottom type for *unsigned integers*.
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub struct UnsignedInteger(pub u64);
+    impl Deref for UnsignedInteger {
+        type Target = u64;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
     impl Element for UnsignedInteger {
         const ID: VInt64 = VInt64::from_encoded(0x12);
         fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
@@ -62,6 +71,105 @@ mod uint {
     }
 }
 
+mod sint {
+    #![allow(dead_code)]
+    use std::ops::Deref;
+
+    use crate::{base::VInt64, element::Element, functional::Buf};
+
+    /// Bottom type for *signed integers*.
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct SignedInteger(pub i64);
+    impl Deref for SignedInteger {
+        type Target = i64;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Element for SignedInteger {
+        const ID: VInt64 = VInt64::from_encoded(0x13);
+        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+            if buf.is_empty() {
+                return Ok(Self(0));
+            }
+            if buf.len() > 8 {
+                return Err(crate::Error::UnderDecode(Self::ID));
+            }
+            let len = buf.len().min(8);
+            let is_neg = (buf[0] & 0x80) != 0;
+            let mut value = if is_neg { [0xFFu8; 8] } else { [0u8; 8] };
+            value[8 - len..].copy_from_slice(&buf[..len]);
+            buf.advance(len);
+            Ok(Self(i64::from_be_bytes(value)))
+        }
+        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            let bytes = self.0.to_be_bytes();
+            if self.0 >= 0 {
+                let first_non_zero = bytes
+                    .iter()
+                    .position(|&b| b != 0)
+                    .unwrap_or(bytes.len() - 1);
+                buf.append_slice(&bytes[first_non_zero..]);
+                Ok(())
+            } else {
+                let first_non_ff = bytes
+                    .iter()
+                    .position(|&b| b != 0xFF)
+                    .unwrap_or(bytes.len() - 1);
+                buf.append_slice(&bytes[first_non_ff..]);
+                Ok(())
+            }
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_sint() {
+            assert_eq!(-2i64.pow(15), -32768);
+
+            let positive = |n: u32| 2i64.pow((n * 8) - 1) - 1;
+            let negative = |n: u32| -2i64.pow((n * 8) - 1);
+
+            let test_pair = [
+                (vec![0u8], 0i64),
+                (vec![1u8], 1i64),
+                (vec![0xFF], -1i64),
+                (vec![0x2A], 42),
+                (vec![0xD6], -42),
+                (vec![0x03, 0xE8], 1000),
+                (vec![0xFC, 0x18], -1000),
+                (vec![0x7F], 127),                                 // 2^7 - 1
+                (vec![0x80], -128),                                // -2^7
+                (vec![0x7F, 0xFF], positive(2)),                   // 2^15 - 1
+                (vec![0x80, 0x00], negative(2)),                   // -2^15
+                (vec![0x7F, 0xFF, 0xFF], positive(3)),             // 2^23 - 1
+                (vec![0x80, 0x00, 0x00], negative(3)),             // -2^23
+                (vec![0x7F, 0xFF, 0xFF, 0xFF], positive(4)),       // 2^31 - 1
+                (vec![0x80, 0x00, 0x00, 0x00], negative(4)),       // -2^31
+                (vec![0x7F, 0xFF, 0xFF, 0xFF, 0xFF], positive(5)), // 2^39 -1
+                (vec![0x80, 0x00, 0x00, 0x00, 0x00], negative(5)), // -2^39
+                (
+                    vec![0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+                    i64::MAX,
+                ),
+                (
+                    vec![0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+                    i64::MIN,
+                ),
+            ];
+            for (encoded, decoded) in test_pair {
+                let v = SignedInteger::decode_body(&mut &*encoded).unwrap();
+                assert_eq!(v, SignedInteger(decoded));
+
+                let mut buf = vec![];
+                SignedInteger(decoded).encode_body(&mut buf).unwrap();
+                assert_eq!(buf, encoded);
+            }
+        }
+    }
+}
 /// Bottom type for *unsigned integers*.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnsignedInteger<const ID: u64>(u64);
