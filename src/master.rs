@@ -17,10 +17,11 @@ macro_rules! nested {
     (required: [$($required:ident),*$(,)?], optional: [$($optional:ident),*$(,)?], multiple: [$($multiple:ident),*$(,)?],) => {
         paste::paste! {
             fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-                let crc32 = Option::<Crc32>::decode(buf)?;
+                let crc32 = Option::<Crc32>::decode(buf).ok().flatten();
                 $( let mut [<$required:snake>] = None;)*
                 $( let mut [<$optional:snake>] = None;)*
                 $( let mut [<$multiple:snake>] = Vec::new();)*
+                let mut void: Option<Void> = None;
 
                 while let Ok(Some(header)) = Option::<Header>::decode(buf) {
                     match header.id {
@@ -28,21 +29,26 @@ macro_rules! nested {
                             if [<$required:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                [<$required:snake>] = Some($required::decode(buf)?)
+                                [<$required:snake>] = Some($required::decode_element(&header, buf)?)
                             }
                         } )*
                         $( $optional::ID => {
                             if [<$optional:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                [<$optional:snake>] = Some($optional::decode(buf)?)
+                                [<$optional:snake>] = Some($optional::decode_element(&header, buf)?)
                             }
                         } )*
                         $( $multiple::ID => {
-                            [<$multiple:snake>].push($multiple::decode(buf)?);
+                            [<$multiple:snake>].push($multiple::decode_element(&header, buf)?);
                         } )*
                         Void::ID => {
-                            buf.advance(*header.size as usize);
+                            let v = Void::decode_element(&header, buf)?;
+                            if let Some(previous) = void {
+                                void = Some(Void { size: previous.size + v.size });
+                            } else {
+                                void = Some(v);
+                            }
                             log::info!("Skipping Void element in Element {}, size: {}B", Self::ID, *header.size);
                         }
                         _ => {
@@ -62,12 +68,18 @@ macro_rules! nested {
                     $( [<$required:snake>]: [<$required:snake>].or(if $required::HAS_DEFAULT_VALUE { Some($required::default()) } else { None }).ok_or(Error::MissingElement($required::ID))?, )*
                     $( [<$optional:snake>], )*
                     $( [<$multiple:snake>], )*
+                    void,
                 })
             }
             fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+                self.crc32.encode(buf)?;
+
                 $( self.[<$required:snake>].encode(buf)?; )*
                 $( self.[<$optional:snake>].encode(buf)?; )*
                 $( self.[<$multiple:snake>].encode(buf)?; )*
+
+                self.void.encode(buf)?;
+
                 Ok(())
             }
         }
@@ -93,6 +105,9 @@ pub struct Ebml {
     pub doc_type_version: Option<DocTypeVersion>,
     /// DocTypeReadVersion element, indicates the minimum version of the document type required to read the file.
     pub doc_type_read_version: Option<DocTypeReadVersion>,
+
+    /// void element, useful for writer reserving space.
+    pub void: Option<Void>,
 }
 
 impl Element for Ebml {
