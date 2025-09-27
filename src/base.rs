@@ -2,12 +2,13 @@ use crate::error::Error;
 use crate::functional::*;
 use crate::io::ReadExt;
 use crate::io::ReadFrom;
+use std::fmt::Debug;
 use std::fmt::Display;
 use std::io::Read;
 use std::ops::Deref;
 
 /// A variable-length integer RFC 8794
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct VInt64(pub u64);
 
 impl Display for VInt64 {
@@ -31,6 +32,14 @@ impl Display for VInt64 {
         } else {
             write!(f, "0x{:016X}", encoded)
         }
+    }
+}
+impl Debug for VInt64 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("VInt64")
+            .field(&self.0)
+            .field(&format!("{}", self))
+            .finish()
     }
 }
 
