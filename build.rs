@@ -44,7 +44,7 @@ fn unsigned(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         "#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]"
     )
     .unwrap();
-    writeln!(file, "pub struct {name}(u64);").unwrap();
+    writeln!(file, "pub struct {name}(pub u64);").unwrap();
     // Implement Deref to u64
     writeln!(file, "impl std::ops::Deref for {name} {{ type Target = u64; fn deref(&self) -> &Self::Target {{ &self.0 }} }}").unwrap();
 
@@ -96,6 +96,16 @@ fn unsigned(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         writeln!(file, "    fn default() -> Self {{").unwrap();
         writeln!(file, "        Self({default_value})").unwrap();
         writeln!(file, "    }}").unwrap();
+        writeln!(file, "}}").unwrap();
+
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element has a default value when not present").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+        writeln!(file, "}}").unwrap();
+    } else {
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
         writeln!(file, "}}").unwrap();
     }
 }
@@ -151,7 +161,7 @@ fn signed(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         "#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]"
     )
     .unwrap();
-    writeln!(file, "pub struct {name}(i64);").unwrap();
+    writeln!(file, "pub struct {name}(pub i64);").unwrap();
     // Implement Deref to i64
     writeln!(file, "impl std::ops::Deref for {name} {{ type Target = i64; fn deref(&self) -> &Self::Target {{ &self.0 }} }}").unwrap();
     // Implement Element
@@ -220,6 +230,16 @@ fn signed(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         writeln!(file, "        Self({default_value})").unwrap();
         writeln!(file, "    }}").unwrap();
         writeln!(file, "}}").unwrap();
+
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element has a default value when not present").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+        writeln!(file, "}}").unwrap();
+    } else {
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
+        writeln!(file, "}}").unwrap();
     }
 }
 // ref:
@@ -279,7 +299,7 @@ fn signed(file: &mut File, name: &str, id: &str, default: Option<&str>) {
 // }
 fn float(file: &mut File, name: &str, id: &str, default: Option<&str>) {
     writeln!(file, "#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]").unwrap();
-    writeln!(file, "pub struct {name}(f64);").unwrap();
+    writeln!(file, "pub struct {name}(pub f64);").unwrap();
     // Implement Deref to f64
     writeln!(file, "impl std::ops::Deref for {name} {{ type Target = f64; fn deref(&self) -> &Self::Target {{ &self.0 }} }}").unwrap();
     // Implement Element
@@ -363,6 +383,16 @@ fn float(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         writeln!(file, "        Self(hexf::hexf64!(\"{default_value}\"))").unwrap();
         writeln!(file, "    }}").unwrap();
         writeln!(file, "}}").unwrap();
+
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element has a default value when not present").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+        writeln!(file, "}}").unwrap();
+    } else {
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
+        writeln!(file, "}}").unwrap();
     }
 }
 
@@ -395,7 +425,7 @@ fn text(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         "#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]"
     )
     .unwrap();
-    writeln!(file, "pub struct {name}(String);").unwrap();
+    writeln!(file, "pub struct {name}(pub String);").unwrap();
     // Implement Deref to str
     writeln!(file, "impl std::ops::Deref for {name} {{ type Target = str; fn deref(&self) -> &Self::Target {{ &self.0 }} }}").unwrap();
     // Implement Element
@@ -439,6 +469,16 @@ fn text(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         writeln!(file, "        Self(\"{default_value}\".to_string())").unwrap();
         writeln!(file, "    }}").unwrap();
         writeln!(file, "}}").unwrap();
+
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element has a default value when not present").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+        writeln!(file, "}}").unwrap();
+    } else {
+        writeln!(file, "impl {name} {{").unwrap();
+        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
+        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
+        writeln!(file, "}}").unwrap();
     }
 }
 
@@ -470,7 +510,7 @@ fn bin(file: &mut File, name: &str, id: &str, _default: Option<&str>) {
         "#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]"
     )
     .unwrap();
-    writeln!(file, "pub struct {name}(Vec<u8>);").unwrap();
+    writeln!(file, "pub struct {name}(pub Vec<u8>);").unwrap();
     // Implement Deref to [u8]
     writeln!(file, "impl std::ops::Deref for {name} {{ type Target = [u8]; fn deref(&self) -> &Self::Target {{ &self.0 }} }}").unwrap();
     // Implement Element
@@ -523,7 +563,7 @@ fn date(file: &mut File, name: &str, id: &str, default: Option<&str>) {
         "#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]"
     )
     .unwrap();
-    writeln!(file, "pub struct {name}(i64);").unwrap();
+    writeln!(file, "pub struct {name}(pub i64);").unwrap();
     // Implement Deref to i64
     writeln!(file, "impl std::ops::Deref for {name} {{ type Target = i64; fn deref(&self) -> &Self::Target {{ &self.0 }} }}").unwrap();
     // Implement Element
@@ -599,6 +639,13 @@ fn main() {
             writeln!(file, "/// {name} in ebml").unwrap();
         }
 
+        // name adjustments
+        let name = match name {
+            "EBMLMaxIDLength" => "EbmlMaxIdLength",
+            "EBMLMaxSizeLength" => "EbmlMaxSizeLength",
+            _ => name,
+        };
+
         match element.attribute("type").unwrap() {
             "uinteger" => unsigned(&mut file, name, id, default_value),
             "integer" => signed(&mut file, name, id, default_value),
@@ -610,4 +657,39 @@ fn main() {
             other => panic!("Unknown type: {other}"),
         };
     }
+
+    writeln!(
+        file,
+        "/// EBMLVersion element, indicates the version of EBML used."
+    )
+    .unwrap();
+    unsigned(&mut file, "EbmlVersion", "0x4286", Some("1"));
+
+    writeln!(
+        file,
+        "/// EBMLReadVersion element, indicates the read version of EBML used."
+    )
+    .unwrap();
+    unsigned(&mut file, "EbmlReadVersion", "0x42f7", Some("1"));
+
+    writeln!(
+        file,
+        "/// DocType element, indicates the type of the document."
+    )
+    .unwrap();
+    text(&mut file, "DocType", "0x4282", Some("matroska"));
+
+    writeln!(
+        file,
+        "/// DocTypeVersion element, indicates the version of the document type."
+    )
+    .unwrap();
+    unsigned(&mut file, "DocTypeVersion", "0x4287", Some("1"));
+
+    writeln!(
+        file,
+        "/// DocTypeReadVersion element, indicates the read version of the document type."
+    )
+    .unwrap();
+    unsigned(&mut file, "DocTypeReadVersion", "0x4285", Some("1"));
 }
