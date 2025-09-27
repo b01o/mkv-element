@@ -264,6 +264,64 @@ mod float {
     }
 }
 
+mod text {
+    #![allow(dead_code)]
+    use std::ops::Deref;
+
+    use crate::{base::VInt64, element::Element, functional::Buf};
+
+    /// Bottom type for *text strings*.
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct Text(pub String);
+    impl Deref for Text {
+        type Target = str;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Element for Text {
+        const ID: VInt64 = VInt64::from_encoded(0x15);
+        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+            let first_zero = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+            let result = Self(String::from_utf8_lossy(&buf[..first_zero]).to_string());
+            buf.advance(buf.len());
+            Ok(result)
+        }
+        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            buf.append_slice(self.0.as_bytes());
+            Ok(())
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_text() {
+            let test_pair = [
+                (vec![], ""),
+                (vec![b'h', b'e', b'y'], "hey"),
+                ("testing utf8 ✓".as_bytes().to_vec(), "testing utf8 ✓"),
+                ("こんにちは".as_bytes().to_vec(), "こんにちは"),
+                (vec![b'h', b'e', b'y', 0, b'w'], "hey"),
+            ];
+
+            for (encoded, decoded) in test_pair {
+                // Decode the text
+                let v = Text::decode_body(&mut &*encoded).unwrap();
+                assert_eq!(v, Text(decoded.to_string()));
+
+                let mut buf = vec![];
+                Text(decoded.to_string()).encode_body(&mut buf).unwrap();
+                if !encoded.contains(&0) {
+                    assert_eq!(buf, encoded);
+                }
+                let new_decoded = Text::decode_body(&mut &*buf).unwrap();
+                assert_eq!(new_decoded, Text(decoded.to_string()));
+            }
+        }
+    }
+}
 /// Bottom type for *unsigned integers*.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnsignedInteger<const ID: u64>(u64);
