@@ -170,6 +170,100 @@ mod sint {
         }
     }
 }
+
+mod float {
+    #![allow(dead_code)]
+    use std::ops::Deref;
+
+    use crate::{base::VInt64, element::Element, functional::Buf};
+
+    /// Bottom type for *floating point numbers*.
+    #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+    pub struct Float(pub f64);
+    impl Deref for Float {
+        type Target = f64;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Element for Float {
+        const ID: VInt64 = VInt64::from_encoded(0x14);
+        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+            match buf.len() {
+                0 => Ok(Self(0.0)),
+                4 => {
+                    let mut value = [0u8; 4];
+                    value.copy_from_slice(&buf[..4]);
+                    buf.advance(4);
+                    Ok(Self(f32::from_be_bytes(value) as f64))
+                }
+                8 => {
+                    let mut value = [0u8; 8];
+                    value.copy_from_slice(&buf[..8]);
+                    buf.advance(8);
+                    Ok(Self(f64::from_be_bytes(value)))
+                }
+                _ => Err(crate::Error::UnderDecode(Self::ID)),
+            }
+        }
+        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            fn can_represent_as_f32(value: f64) -> bool {
+                if value.is_infinite() || value.is_nan() {
+                    return false;
+                }
+
+                if value.abs() > f32::MAX as f64
+                    || (value != 0.0 && value.abs() < f32::MIN_POSITIVE as f64)
+                {
+                    return false;
+                }
+
+                let f32_value = value as f32;
+                f32_value as f64 == value
+            }
+
+            if can_represent_as_f32(self.0) {
+                buf.append_slice(&(self.0 as f32).to_be_bytes());
+                Ok(())
+            } else {
+                buf.append_slice(&self.0.to_be_bytes());
+                Ok(())
+            }
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_float() {
+            let test_pair = [
+                0f64,
+                -1.0,
+                1.0,
+                f32::MIN_POSITIVE as f64,
+                f32::MIN as f64,
+                f32::MAX as f64,
+                f64::MIN_POSITIVE,
+                f64::MIN,
+                f64::MAX,
+            ]
+            .iter()
+            .map(|&v| (v.to_be_bytes().to_vec(), v));
+
+            for (encoded, decoded) in test_pair {
+                let v = Float::decode_body(&mut &*encoded).unwrap();
+                assert_eq!(v, Float(decoded));
+
+                let mut buf = vec![];
+                Float(decoded).encode_body(&mut buf).unwrap();
+                let new_v = Float::decode_body(&mut &*buf).unwrap();
+                assert_eq!(new_v, Float(decoded));
+            }
+        }
+    }
+}
+
 /// Bottom type for *unsigned integers*.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnsignedInteger<const ID: u64>(u64);
