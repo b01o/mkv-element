@@ -322,6 +322,109 @@ mod text {
         }
     }
 }
+
+mod bin {
+    #![allow(dead_code)]
+    use std::ops::Deref;
+
+    use crate::{base::VInt64, element::Element, functional::Buf};
+
+    /// Bottom type for *binary data*.
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct Bin(pub Vec<u8>);
+    impl Deref for Bin {
+        type Target = [u8];
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Element for Bin {
+        const ID: VInt64 = VInt64::from_encoded(0x16);
+        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+            let result = Self(buf.to_vec());
+            buf.advance(buf.len());
+            Ok(result)
+        }
+        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            buf.append_slice(&self.0);
+            Ok(())
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_bin() {
+            let test_pair = [
+                (vec![], vec![]),
+                (vec![1, 2, 3], vec![1, 2, 3]),
+                ((0..=255).collect(), (0..=255).collect()),
+            ];
+
+            for (encoded, decoded) in test_pair {
+                let v = Bin::decode_body(&mut &*encoded).unwrap();
+                assert_eq!(v, Bin(decoded.clone()));
+
+                let mut buf = vec![];
+                Bin(decoded.clone()).encode_body(&mut buf).unwrap();
+                assert_eq!(buf, encoded);
+            }
+        }
+    }
+}
+
+mod date {
+    #![allow(dead_code)]
+    use std::ops::Deref;
+
+    use crate::{base::VInt64, element::Element, functional::Buf};
+
+    /// Bottom type for *date/time values*.
+    /// Represents the number of nanoseconds since the 2001-01-01T00:00:00 UTC.
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct Date(pub i64);
+    impl Deref for Date {
+        type Target = i64;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Element for Date {
+        const ID: VInt64 = VInt64::from_encoded(0x17);
+        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+            if buf.len() != 8 {
+                return Err(crate::Error::UnderDecode(Self::ID));
+            }
+            let result = i64::from_be_bytes(buf[..8].try_into().unwrap());
+            buf.advance(8);
+            Ok(Self(result))
+        }
+        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            buf.append_slice(&self.0.to_be_bytes());
+            Ok(())
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_date() {
+            let test_cases = [0i64, 1, -1, i64::MIN, i64::MAX];
+
+            for n in test_cases {
+                let date = Date::decode_body(&mut &n.to_be_bytes()[..]).unwrap();
+                assert_eq!(date, Date(n));
+
+                let mut buf = vec![];
+                date.encode_body(&mut buf).unwrap();
+                assert_eq!(buf, n.to_be_bytes());
+            }
+        }
+    }
+}
+
 /// Bottom type for *unsigned integers*.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnsignedInteger<const ID: u64>(u64);
