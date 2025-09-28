@@ -1,3 +1,6 @@
 [submodule "matroska-specification"]
 	path = matroska-specification
 	url = https://github.com/ietf-wg-cellar/matroska-specification.git
+[submodule "matroska-test-files"]
+	path = matroska-test-files
+	url = https://github.com/ietf-wg-cellar/matroska-test-files.git
