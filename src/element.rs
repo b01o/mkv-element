@@ -6,6 +6,7 @@ use crate::io::ReadFrom;
 /// A Matroska element.
 pub trait Element: Sized {
     const ID: VInt64;
+    const HAS_DEFAULT_VALUE: bool = false;
     fn decode_body(buf: &mut &[u8]) -> crate::Result<Self>;
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()>;
 }

@@ -88,26 +88,21 @@ fn unsigned(file: &mut File, name: &str, id: &str, default: Option<&str>) {
     writeln!(file, "        buf.append_slice(&bytes[first_non_zero..]);").unwrap();
     writeln!(file, "        Ok(())").unwrap();
     writeln!(file, "    }}").unwrap();
+    if default.is_some() {
+        writeln!(file, "    const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+    }
     writeln!(file, "}}").unwrap();
 
     // Implement Default if default is Some
+    writeln!(file, "impl Default for {name} {{").unwrap();
+    writeln!(file, "    fn default() -> Self {{").unwrap();
     if let Some(default_value) = default {
-        writeln!(file, "impl Default for {name} {{").unwrap();
-        writeln!(file, "    fn default() -> Self {{").unwrap();
         writeln!(file, "        Self({default_value})").unwrap();
-        writeln!(file, "    }}").unwrap();
-        writeln!(file, "}}").unwrap();
-
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element has a default value when not present").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
-        writeln!(file, "}}").unwrap();
     } else {
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
-        writeln!(file, "}}").unwrap();
+        writeln!(file, "        Self(0)").unwrap();
     }
+    writeln!(file, "    }}").unwrap();
+    writeln!(file, "}}").unwrap();
 }
 
 // ref:
@@ -221,26 +216,21 @@ fn signed(file: &mut File, name: &str, id: &str, default: Option<&str>) {
     writeln!(file, "            Ok(())").unwrap();
     writeln!(file, "        }}").unwrap();
     writeln!(file, "    }}").unwrap();
+    if default.is_some() {
+        writeln!(file, "    const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+    }
     writeln!(file, "}}").unwrap();
 
     // Implement Default if default is Some
+    writeln!(file, "impl Default for {name} {{").unwrap();
+    writeln!(file, "    fn default() -> Self {{").unwrap();
     if let Some(default_value) = default {
-        writeln!(file, "impl Default for {name} {{").unwrap();
-        writeln!(file, "    fn default() -> Self {{").unwrap();
         writeln!(file, "        Self({default_value})").unwrap();
-        writeln!(file, "    }}").unwrap();
-        writeln!(file, "}}").unwrap();
-
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element has a default value when not present").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
-        writeln!(file, "}}").unwrap();
     } else {
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
-        writeln!(file, "}}").unwrap();
+        writeln!(file, "        Self(0)").unwrap();
     }
+    writeln!(file, "    }}").unwrap();
+    writeln!(file, "}}").unwrap();
 }
 // ref:
 // #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
@@ -374,26 +364,21 @@ fn float(file: &mut File, name: &str, id: &str, default: Option<&str>) {
     writeln!(file, "            Ok(())").unwrap();
     writeln!(file, "        }}").unwrap();
     writeln!(file, "    }}").unwrap();
+    if default.is_some() {
+        writeln!(file, "    const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+    }
     writeln!(file, "}}").unwrap();
 
     // Implement Default if default is Some
+    writeln!(file, "impl Default for {name} {{").unwrap();
+    writeln!(file, "    fn default() -> Self {{").unwrap();
     if let Some(default_value) = default {
-        writeln!(file, "impl Default for {name} {{").unwrap();
-        writeln!(file, "    fn default() -> Self {{").unwrap();
         writeln!(file, "        Self(hexf::hexf64!(\"{default_value}\"))").unwrap();
-        writeln!(file, "    }}").unwrap();
-        writeln!(file, "}}").unwrap();
-
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element has a default value when not present").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
-        writeln!(file, "}}").unwrap();
     } else {
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
-        writeln!(file, "}}").unwrap();
+        writeln!(file, "        Self(0.0)").unwrap();
     }
+    writeln!(file, "    }}").unwrap();
+    writeln!(file, "}}").unwrap();
 }
 
 // ref:
@@ -460,26 +445,21 @@ fn text(file: &mut File, name: &str, id: &str, default: Option<&str>) {
     writeln!(file, "        buf.append_slice(self.0.as_bytes());").unwrap();
     writeln!(file, "        Ok(())").unwrap();
     writeln!(file, "    }}").unwrap();
+    if default.is_some() {
+        writeln!(file, "    const HAS_DEFAULT_VALUE: bool = true;").unwrap();
+    }
     writeln!(file, "}}").unwrap();
 
     // Implement Default if default is Some
+    writeln!(file, "impl Default for {name} {{").unwrap();
+    writeln!(file, "    fn default() -> Self {{").unwrap();
     if let Some(default_value) = default {
-        writeln!(file, "impl Default for {name} {{").unwrap();
-        writeln!(file, "    fn default() -> Self {{").unwrap();
         writeln!(file, "        Self(\"{default_value}\".to_string())").unwrap();
-        writeln!(file, "    }}").unwrap();
-        writeln!(file, "}}").unwrap();
-
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element has a default value when not present").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = true;").unwrap();
-        writeln!(file, "}}").unwrap();
     } else {
-        writeln!(file, "impl {name} {{").unwrap();
-        writeln!(file, "    /// Element DOES NOT have a default value").unwrap();
-        writeln!(file, "    pub const HAS_DEFAULT_VALUE: bool = false;").unwrap();
-        writeln!(file, "}}").unwrap();
+        writeln!(file, "        Self(String::new())").unwrap();
     }
+    writeln!(file, "    }}").unwrap();
+    writeln!(file, "}}").unwrap();
 }
 
 // ref:
@@ -528,6 +508,12 @@ fn bin(file: &mut File, name: &str, id: &str, _default: Option<&str>) {
     writeln!(file, "    fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {{").unwrap();
     writeln!(file, "        buf.append_slice(&self.0);").unwrap();
     writeln!(file, "        Ok(())").unwrap();
+    writeln!(file, "    }}").unwrap();
+    writeln!(file, "}}").unwrap();
+
+    writeln!(file, "impl Default for {name} {{").unwrap();
+    writeln!(file, "    fn default() -> Self {{").unwrap();
+    writeln!(file, "        Self(Vec::new())").unwrap();
     writeln!(file, "    }}").unwrap();
     writeln!(file, "}}").unwrap();
 }
@@ -596,13 +582,15 @@ fn date(file: &mut File, name: &str, id: &str, default: Option<&str>) {
     writeln!(file, "}}").unwrap();
 
     // Implement Default if default is Some
+    writeln!(file, "impl Default for {name} {{").unwrap();
+    writeln!(file, "    fn default() -> Self {{").unwrap();
     if let Some(default_value) = default {
-        writeln!(file, "impl Default for {name} {{").unwrap();
-        writeln!(file, "    fn default() -> Self {{").unwrap();
         writeln!(file, "        Self({default_value})").unwrap();
-        writeln!(file, "    }}").unwrap();
-        writeln!(file, "}}").unwrap();
+    } else {
+        writeln!(file, "        Self(0)").unwrap();
     }
+    writeln!(file, "    }}").unwrap();
+    writeln!(file, "}}").unwrap();
 }
 
 fn main() {
@@ -643,6 +631,14 @@ fn main() {
         let name = match name {
             "EBMLMaxIDLength" => "EbmlMaxIdLength",
             "EBMLMaxSizeLength" => "EbmlMaxSizeLength",
+            "SeekID" => "SeekId",
+            "SegmentUUID" => "SegmentUuid",
+            "PrevUUID" => "PrevUuid",
+            "NextUUID" => "NextUuid",
+            "DateUTC" => "DateUtc",
+            "ChapterTranslateID" => "ChapterTranslateId",
+            "ChapterTranslateEditionUID" => "ChapterTranslateEditionUid",
+            "BlockAddID" => "BlockAddId",
             _ => name,
         };
 
