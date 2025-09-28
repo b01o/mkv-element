@@ -18,7 +18,7 @@ pub mod leaf;
 pub mod master;
 /// Supplementary elements in Matroska. Void elements, CRC-32, etc.
 ///
-/// These elements are not from the official Matroska specification, but are commonly used in practice.
+/// These elements are not from the Matroska specification, but Matroska specifications inherit them from EBML specifications.
 pub mod supplement;
 
 mod element;
