@@ -332,13 +332,13 @@ mod tests {
         assert!(!v2.is_unknown);
         assert!(!vv2.is_unknown);
 
-        let v3 = VInt64::read_from(&mut std::io::Cursor::new(vec![0x40, 0xFF])).unwrap();
+        let v3 = VInt64::read_from(&mut std::io::Cursor::new(vec![0x40, 0x7F])).unwrap();
         let vv3 = VInt64::from_encoded(0x407F);
         assert_eq!(*v3, 127);
         assert_eq!(*vv3, 127);
 
         assert_ne!(VInt64::new(127), VInt64::new_unknown());
-        assert_eq!(VInt64::new(127).as_encoded(), 0x40FF);
+        assert_eq!(VInt64::new(127).as_encoded(), 0x407F);
     }
 }
 

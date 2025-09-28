@@ -32,7 +32,7 @@ See the [Matroska specifications](https://www.matroska.org/technical/elements.ht
 
 ## Acknowledgements
 Some of the ideas and code snippets were inspired by ~or stolen from~ the following sources, thanks to their authors:
-- [mp4-atom](https://github.com/kixelated/mp4-atom) by <b>kixelated</b>
+- [mp4-atom](https://github.com/kixelated/mp4-atom) by *kixelated*
 - [Network protocols, sans I/O](https://sans-io.readthedocs.io/)
 
 #### License
