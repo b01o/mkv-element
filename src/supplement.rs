@@ -5,6 +5,12 @@ use crate::element::Element;
 use crate::functional::*;
 
 /// Ebml Void element, used for padding.
+///
+/// ### Note:
+/// Every Master element contains an optional Void element at the end of its body, which is used for padding.
+/// This library automatically aggregates multiple Void elements into one at the end.
+/// * When reading, all Void elements at the same level will be counted as one, sizes are accumulated.
+/// * When writing, only one Void element will be written at the end, with size equal to the sum of all Void elements at the same level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Void {
     /// Size of the void element in bytes.
@@ -24,6 +30,10 @@ impl Element for Void {
 }
 
 /// CRC-32 element, used for integrity checking. The CRC-32 is stored as a little-endian u32.
+///
+/// ### Note:
+/// * This element can be included in any Master element to provide a CRC-32 checksum of the element's data.
+/// * It has to be the **first** element in the Master element's body if it is present.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Crc32(pub u32);
 impl Deref for Crc32 {

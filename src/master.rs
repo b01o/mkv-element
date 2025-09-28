@@ -134,24 +134,22 @@ pub struct Segment {
     pub cluster: Vec<Cluster>,
     /// A Top-Level Element of information with many tracks described.
     pub tracks: Option<Tracks>,
-    // /// A Top-Level Element to speed seeking access. All entries are local to the Segment. This Element **SHOULD** be set when the Segment is not transmitted as a live stream (see #livestreaming).
-    // pub cues: Option<Cues>,
-    // /// Contain attached files.
-    // pub attachments: Option<Attachments>,
-    // /// A system to define basic menus and partition data. For more detailed information, look at the Chapters explanation in chapters.
-    // pub chapters: Option<Chapters>,
-    // /// Element containing metadata describing Tracks, Editions, Chapters, Attachments, or the Segment as a whole. A list of valid tags can be found in [Matroska tagging RFC](https://www.matroska.org/technical/tagging.html).
-    // pub tags: Vec<Tags>,
+    /// A Top-Level Element to speed seeking access. All entries are local to the Segment. This Element **SHOULD** be set when the Segment is not transmitted as a live stream (see #livestreaming).
+    pub cues: Option<Cues>,
+    /// Contain attached files.
+    pub attachments: Option<Attachments>,
+    /// A system to define basic menus and partition data. For more detailed information, look at the Chapters explanation in chapters.
+    pub chapters: Option<Chapters>,
+    /// Element containing metadata describing Tracks, Editions, Chapters, Attachments, or the Segment as a whole. A list of valid tags can be found in [Matroska tagging RFC](https://www.matroska.org/technical/tagging.html).
+    pub tags: Vec<Tags>,
 }
 
 impl Element for Segment {
     const ID: VInt64 = VInt64::from_encoded(0x18538067);
     nested! {
       required: [ Info ],
-      // Tracks, Cues, Attachments, Chapters
-      optional: [ Tracks ],
-      multiple: [ SeekHead, Cluster ],
-    //   multiple: [ SeekHead, Tags, Cluster ],
+      optional: [ Tracks, Cues, Attachments, Chapters ],
+      multiple: [ SeekHead, Tags, Cluster ],
     }
 }
 
@@ -1078,5 +1076,515 @@ impl Element for ContentEncAesSettings {
         required: [ AesSettingsCipherMode ],
         optional: [ ],
         multiple: [ ],
+    }
+}
+
+/// A Top-Level Element to speed seeking access. All entries are local to the Segment. This Element **SHOULD** be set when the Segment is not transmitted as a live stream (see #livestreaming).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Cues {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Contains all information relative to a seek point in the Segment.
+    pub cue_point: Vec<CuePoint>,
+}
+
+impl Element for Cues {
+    const ID: VInt64 = VInt64::from_encoded(0x1C53BB6B);
+    nested! {
+      required: [ ],
+      optional: [ ],
+      multiple: [ CuePoint ],
+    }
+}
+
+/// Contains all information relative to a seek point in the Segment.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CuePoint {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Absolute timestamp of the seek point, expressed in Matroska Ticks -- i.e., in nanoseconds; see timestamp-ticks.
+    pub cue_time: CueTime,
+    /// Contain positions for different tracks corresponding to the timestamp.
+    pub cue_track_positions: Vec<CueTrackPositions>,
+}
+
+impl Element for CuePoint {
+    const ID: VInt64 = VInt64::from_encoded(0xBB);
+    nested! {
+      required: [ CueTime ],
+      optional: [ ],
+      multiple: [ CueTrackPositions ],
+    }
+}
+
+/// Contain positions for different tracks corresponding to the timestamp.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CueTrackPositions {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// The track for which a position is given.
+    pub cue_track: CueTrack,
+    /// The Segment Position (segment-position) of the Cluster containing the associated Block.
+    pub cue_cluster_position: CueClusterPosition,
+    /// The relative position inside the Cluster of the referenced SimpleBlock or BlockGroup with 0 being the first possible position for an Element inside that Cluster.
+    pub cue_relative_position: Option<CueRelativePosition>,
+    /// The duration of the block, expressed in Segment Ticks which is based on TimestampScale; see timestamp-ticks. If missing, the track's DefaultDuration does not apply and no duration information is available in terms of the cues.
+    pub cue_duration: Option<CueDuration>,
+    /// Number of the Block in the specified Cluster.
+    pub cue_block_number: Option<CueBlockNumber>,
+    /// The Segment Position (segment-position) of the Codec State corresponding to this Cue Element. 0 means that the data is taken from the initial Track Entry.
+    pub cue_codec_state: CueCodecState,
+    /// The Clusters containing the referenced Blocks.
+    pub cue_reference: Vec<CueReference>,
+}
+
+impl Element for CueTrackPositions {
+    const ID: VInt64 = VInt64::from_encoded(0xB7);
+    nested! {
+      required: [ CueTrack, CueClusterPosition, CueCodecState ],
+      optional: [ CueRelativePosition, CueDuration, CueBlockNumber ],
+      multiple: [ CueReference ],
+    }
+}
+
+/// The Clusters containing the referenced Blocks.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CueReference {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Timestamp of the referenced Block, expressed in Matroska Ticks -- i.e., in nanoseconds; see timestamp-ticks.
+    pub cue_ref_time: CueRefTime,
+}
+
+impl Element for CueReference {
+    const ID: VInt64 = VInt64::from_encoded(0xDB);
+    nested! {
+      required: [ CueRefTime ],
+      optional: [ ],
+      multiple: [ ],
+    }
+}
+
+/// Contain attached files.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Attachments {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// An attached file.
+    pub attached_file: Vec<AttachedFile>,
+}
+impl Element for Attachments {
+    const ID: VInt64 = VInt64::from_encoded(0x1941A469);
+    nested! {
+      required: [ ],
+      optional: [ ],
+      multiple: [ AttachedFile ],
+    }
+}
+
+/// An attached file.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AttachedFile {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// A human-friendly name for the attached file.
+    pub file_description: Option<FileDescription>,
+    /// Filename of the attached file.
+    pub file_name: FileName,
+    /// Media type of the file following the \[@!RFC6838\] format.
+    pub file_media_type: FileMediaType,
+    /// The data of the file.
+    pub file_data: FileData,
+    /// Unique ID representing the file, as random as possible.
+    pub file_uid: FileUid,
+}
+
+impl Element for AttachedFile {
+    const ID: VInt64 = VInt64::from_encoded(0x61A7);
+    nested! {
+        required: [ FileName, FileMediaType, FileData, FileUid ],
+        optional: [ FileDescription ],
+        multiple: [ ],
+    }
+}
+/// A system to define basic menus and partition data. For more detailed information, look at the Chapters explanation in [chapters](https://www.matroska.org/technical/chapters.html).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Chapters {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Contains all information about a Segment edition.
+    pub edition_entry: Vec<EditionEntry>,
+}
+
+impl Element for Chapters {
+    const ID: VInt64 = VInt64::from_encoded(0x1043A770);
+    nested! {
+        required: [ ],
+        optional: [ ],
+        multiple: [ EditionEntry ],
+    }
+}
+
+/// Contains all information about a Segment edition.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EditionEntry {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// A unique ID to identify the edition. It's useful for tagging an edition.
+    pub edition_uid: Option<EditionUid>,
+    /// Set to 1 if an edition is hidden. Hidden editions **SHOULD NOT** be available to the user interface (but still to Control Tracks; see [notes](https://www.matroska.org/technical/chapters.html#flags) on Chapter flags).
+    pub edition_flag_hidden: EditionFlagHidden,
+    /// Set to 1 if the edition **SHOULD** be used as the default one.
+    pub edition_flag_default: EditionFlagDefault,
+    /// Set to 1 if the chapters can be defined multiple times and the order to play them is enforced; see editionflagordered.
+    pub edition_flag_ordered: EditionFlagOrdered,
+    /// Contains a possible string to use for the edition display for the given languages.
+    pub edition_display: Vec<EditionDisplay>,
+    /// Contains the atom information to use as the chapter atom (apply to all tracks).
+    pub chapter_atom: Vec<ChapterAtom>,
+}
+
+impl Element for EditionEntry {
+    const ID: VInt64 = VInt64::from_encoded(0x45B9);
+    nested! {
+        required: [ EditionFlagHidden, EditionFlagDefault, EditionFlagOrdered ],
+        optional: [ EditionUid ],
+        multiple: [ EditionDisplay, ChapterAtom ],
+    }
+}
+
+/// Contains a possible string to use for the edition display for the given languages.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EditionDisplay {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Contains the string to use as the edition name.
+    pub edition_string: EditionString,
+    /// One language corresponding to the EditionString, in the \[@!BCP47\] form; see basics on language codes.
+    pub edition_language_ietf: Vec<EditionLanguageIetf>,
+}
+
+impl Element for EditionDisplay {
+    const ID: VInt64 = VInt64::from_encoded(0x4520);
+    nested! {
+        required: [ EditionString ],
+        optional: [ ],
+        multiple: [ EditionLanguageIetf ],
+    }
+}
+
+/// Contains the atom information to use as the chapter atom (apply to all tracks).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ChapterAtom {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Contains the atom information to use as the chapter atom (apply to all tracks).
+    pub chapter_uid: ChapterUid,
+    /// A unique string ID to identify the Chapter. For example it is used as the storage for \[@?WebVTT\] cue identifier values.
+    pub chapter_string_uid: Option<ChapterStringUid>,
+    /// Timestamp of the start of Chapter, expressed in Matroska Ticks -- i.e., in nanoseconds; see timestamp-ticks.
+    pub chapter_time_start: ChapterTimeStart,
+    /// Timestamp of the end of Chapter timestamp excluded, expressed in Matroska Ticks -- i.e., in nanoseconds; see timestamp-ticks. The value **MUST** be greater than or equal to the `ChapterTimeStart` of the same `ChapterAtom`. The `ChapterTimeEnd` timestamp value being excluded, it **MUST** take in account the duration of the last frame it includes, especially for the `ChapterAtom` using the last frames of the `Segment`. ChapterTimeEnd **MUST** be set if the Edition is an ordered edition; see (#editionflagordered), unless it's a Parent Chapter; see (#nested-chapters)
+    pub chapter_time_end: Option<ChapterTimeEnd>,
+    /// Set to 1 if a chapter is hidden. Hidden chapters **SHOULD NOT** be available to the user interface (but still to Control Tracks; see chapterflaghidden on Chapter flags).
+    pub chapter_flag_hidden: ChapterFlagHidden,
+    /// Set to 1 if the chapter is enabled. It can be enabled/disabled by a Control Track. When disabled, the movie **SHOULD** skip all the content between the TimeStart and TimeEnd of this chapter; see notes on Chapter flags.
+    pub chapter_flag_enabled: ChapterFlagEnabled,
+    /// The SegmentUUID of another Segment to play during this chapter. The value **MUST NOT** be the `SegmentUUID` value of the `Segment` it belongs to. ChapterSegmentUUID **MUST** be set if ChapterSegmentEditionUID is used; see (#medium-linking) on medium-linking Segments.
+    pub chapter_segment_uuid: Option<ChapterSegmentUuid>,
+    /// Indicate what type of content the ChapterAtom contains and might be skipped. It can be used to automatically skip content based on the type. If a `ChapterAtom` is inside a `ChapterAtom` that has a `ChapterSkipType` set, it **MUST NOT** have a `ChapterSkipType` or have a `ChapterSkipType` with the same value as it's parent `ChapterAtom`. If the `ChapterAtom` doesn't contain a `ChapterTimeEnd`, the value of the `ChapterSkipType` is only valid until the next `ChapterAtom` with a `ChapterSkipType` value or the end of the file.
+    /// * 0 - No Skipping,
+    /// * 1 - Opening Credits,
+    /// * 2 - End Credits,
+    /// * 3 - Recap,
+    /// * 4 - Next Preview,
+    /// * 5 - Preview,
+    /// * 6 - Advertisement
+    pub chapter_skip_type: Option<ChapterSkipType>,
+    /// The EditionUID to play from the Segment linked in ChapterSegmentUUID. If ChapterSegmentEditionUID is undeclared, then no Edition of the linked Segment is used; see medium-linking on medium-linking Segments.
+    pub chapter_segment_edition_uid: Option<ChapterSegmentEditionUid>,
+    /// Specify the physical equivalent of this ChapterAtom like "DVD" (60) or "SIDE" (50); see notes for a complete list of values.
+    pub chapter_physical_equiv: Option<ChapterPhysicalEquiv>,
+    /// List of tracks on which the chapter applies. If this Element is not present, all tracks apply
+    pub chapter_track: Option<ChapterTrack>,
+    /// Contains all possible strings to use for the chapter display.
+    pub chapter_display: Vec<ChapterDisplay>,
+    /// Contains all the commands associated to the Atom.
+    pub chap_process: Vec<ChapProcess>,
+
+    /// Contains nested ChapterAtoms, used when chapter have sub-chapters or sub-sections
+    pub chapter_atom: Vec<ChapterAtom>,
+}
+
+impl Element for ChapterAtom {
+    const ID: VInt64 = VInt64::from_encoded(0xB6);
+    nested! {
+        required: [ ChapterUid, ChapterTimeStart, ChapterFlagHidden, ChapterFlagEnabled ],
+        optional: [ ChapterStringUid, ChapterTimeEnd, ChapterSegmentUuid, ChapterSkipType, ChapterSegmentEditionUid, ChapterPhysicalEquiv, ChapterTrack ],
+        multiple: [ ChapterDisplay, ChapProcess, ChapterAtom ],
+    }
+}
+
+/// List of tracks on which the chapter applies. If this Element is not present, all tracks apply
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ChapterTrack {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// UID of the Track to apply this chapter to. In the absence of a control track, choosing this chapter will select the listed Tracks and deselect unlisted tracks. Absence of this Element indicates that the Chapter **SHOULD** be applied to any currently used Tracks.
+    pub chapter_track_uid: Vec<ChapterTrackUid>,
+}
+impl Element for ChapterTrack {
+    const ID: VInt64 = VInt64::from_encoded(0x8F);
+    nested! {
+        required: [ ],
+        optional: [ ],
+        multiple: [ ChapterTrackUid ],
+    }
+}
+
+/// Contains all possible strings to use for the chapter display.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ChapterDisplay {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Contains the string to use as the chapter atom.
+    pub chap_string: ChapString,
+    /// A language corresponding to the string, in the Matroska languages form; see basics on language codes. This Element **MUST** be ignored if a ChapLanguageBCP47 Element is used within the same ChapterDisplay Element.
+    pub chap_language: Vec<ChapLanguage>,
+    /// A language corresponding to the ChapString, in the \[@!BCP47\] form; see basics on language codes. If a ChapLanguageBCP47 Element is used, then any ChapLanguage and ChapCountry Elements used in the same ChapterDisplay **MUST** be ignored.
+    pub chap_language_bcp47: Vec<ChapLanguageBcp47>,
+    /// A country corresponding to the string, in the Matroska countries form; see basics on country codes. This Element **MUST** be ignored if a ChapLanguageBCP47 Element is used within the same ChapterDisplay Element.
+    pub chap_country: Vec<ChapCountry>,
+}
+
+impl Element for ChapterDisplay {
+    const ID: VInt64 = VInt64::from_encoded(0x80);
+    nested! {
+        required: [ ChapString ],
+        optional: [ ],
+        multiple: [ ChapLanguage, ChapLanguageBcp47, ChapCountry ],
+    }
+}
+
+/// Contains nested ChapterAtoms, used when chapter have sub-chapters or sub-sections
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ChapProcess {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Contains the type of the codec used for the processing. A value of 0 means native Matroska processing (to be defined), a value of 1 means the DVD command set is used; see menu-features on DVD menus. More codec IDs can be added later.
+    pub chap_process_codec_id: ChapProcessCodecId,
+    /// Some optional data attached to the ChapProcessCodecID information. For ChapProcessCodecID = 1, it is the "DVD level" equivalent; see menu-features on DVD menus.
+    pub chap_process_private: Option<ChapProcessPrivate>,
+    /// Contains all the commands associated to the Atom.
+    pub chap_process_command: Vec<ChapProcessCommand>,
+}
+
+impl Element for ChapProcess {
+    const ID: VInt64 = VInt64::from_encoded(0x6944);
+    nested! {
+        required: [ ChapProcessCodecId ],
+        optional: [ ChapProcessPrivate ],
+        multiple: [ ChapProcessCommand ],
+    }
+}
+
+/// Contains all the commands associated to the Atom.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ChapProcessCommand {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Defines when the process command **SHOULD** be handled
+    /// * 0 - during the whole chapter,
+    /// * 1 - before starting playback,
+    /// * 2 - after playback of the chapter
+    pub chap_process_time: ChapProcessTime,
+    /// Contains the command information. The data **SHOULD** be interpreted depending on the ChapProcessCodecID value. For ChapProcessCodecID = 1, the data correspond to the binary DVD cell pre/post commands; see menu-features on DVD menus.
+    pub chap_process_data: ChapProcessData,
+}
+
+impl Element for ChapProcessCommand {
+    const ID: VInt64 = VInt64::from_encoded(0x6911);
+    nested! {
+        required: [ ChapProcessTime, ChapProcessData ],
+        optional: [ ],
+        multiple: [ ],
+    }
+}
+
+/// Element containing metadata describing Tracks, Editions, Chapters, Attachments, or the Segment as a whole. A list of valid tags can be found in Matroska tagging RFC.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Tags {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// A single metadata descriptor.
+    pub tag: Vec<Tag>,
+}
+
+impl Element for Tags {
+    const ID: VInt64 = VInt64::from_encoded(0x1254C367);
+    nested! {
+      required: [ ],
+      optional: [ ],
+      multiple: [ Tag ],
+    }
+}
+
+/// A single metadata descriptor.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Tag {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// Specifies which other elements the metadata represented by the Tag applies to. If empty or omitted, then the Tag describes everything in the Segment.
+    pub targets: Targets,
+    /// Contains general information about the target.
+    pub simple_tag: Vec<SimpleTag>,
+}
+
+impl Element for Tag {
+    const ID: VInt64 = VInt64::from_encoded(0x7373);
+    nested! {
+      required: [ Targets ],
+      optional: [ ],
+      multiple: [ SimpleTag ],
+    }
+}
+
+/// Specifies which other elements the metadata represented by the Tag applies to. If empty or omitted, then the Tag describes everything in the Segment.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Targets {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// A number to indicate the logical level of the target.
+    /// * 70 - COLLECTION,
+    /// * 60 - EDITION / ISSUE / VOLUME / OPUS / SEASON / SEQUEL,
+    /// * 50 - ALBUM / OPERA / CONCERT / MOVIE / EPISODE,
+    /// * 40 - PART / SESSION,
+    /// * 30 - TRACK / SONG / CHAPTER,
+    /// * 20 - SUBTRACK / MOVEMENT / SCENE,
+    /// * 10 - SHOT
+    pub target_type_value: TargetTypeValue,
+    /// An informational string that can be used to display the logical level of the target like "ALBUM", "TRACK", "MOVIE", "CHAPTER", etc. ; see Section 6.4 of Matroska tagging RFC.
+    /// * COLLECTION - TargetTypeValue 70,
+    /// * EDITION - TargetTypeValue 60,
+    /// * ISSUE - TargetTypeValue 60,
+    /// * VOLUME - TargetTypeValue 60,
+    /// * OPUS - TargetTypeValue 60,
+    /// * SEASON - TargetTypeValue 60,
+    /// * SEQUEL - TargetTypeValue 60,
+    /// * ALBUM - TargetTypeValue 50,
+    /// * OPERA - TargetTypeValue 50,
+    /// * CONCERT - TargetTypeValue 50,
+    /// * MOVIE - TargetTypeValue 50,
+    /// * EPISODE - TargetTypeValue 50,
+    /// * PART - TargetTypeValue 40,
+    /// * SESSION - TargetTypeValue 40,
+    /// * TRACK - TargetTypeValue 30,
+    /// * SONG - TargetTypeValue 30,
+    /// * CHAPTER - TargetTypeValue 30,
+    /// * SUBTRACK - TargetTypeValue 20,
+    /// * MOVEMENT - TargetTypeValue 20,
+    /// * SCENE - TargetTypeValue 20,
+    /// * SHOT - TargetTypeValue 10
+    pub target_type: Option<TargetType>,
+    /// A unique ID to identify the Track(s) the tags belong to. If the value is 0 at this level, the tags apply to all tracks in the Segment. If set to any other value, it **MUST** match the `TrackUID` value of a track found in this Segment.
+    pub tag_track_uid: Vec<TagTrackUid>,
+    /// A unique ID to identify the EditionEntry(s) the tags belong to. If the value is 0 at this level, the tags apply to all editions in the Segment. If set to any other value, it **MUST** match the `EditionUID` value of an edition found in this Segment.
+    pub tag_edition_uid: Vec<TagEditionUid>,
+    /// A unique ID to identify the Chapter(s) the tags belong to. If the value is 0 at this level, the tags apply to all chapters in the Segment. If set to any other value, it **MUST** match the `ChapterUID` value of a chapter found in this Segment.
+    pub tag_chapter_uid: Vec<TagChapterUid>,
+    /// A unique ID to identify the Attachment(s) the tags belong to. If the value is 0 at this level, the tags apply to all the attachments in the Segment. If set to any other value, it **MUST** match the `FileUID` value of an attachment found in this Segment.
+    pub tag_attachment_uid: Vec<TagAttachmentUid>,
+}
+
+impl Element for Targets {
+    const ID: VInt64 = VInt64::from_encoded(0x63C0);
+    nested! {
+      required: [ TargetTypeValue ],
+      optional: [ TargetType ],
+      multiple: [ TagTrackUid, TagEditionUid, TagChapterUid, TagAttachmentUid ],
+    }
+}
+
+/// Contains general information about the target.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SimpleTag {
+    /// Optional CRC-32 element for integrity checking.
+    pub crc32: Option<Crc32>,
+    /// void element, useful for reserving space during writing.
+    pub void: Option<Void>,
+
+    /// The name of the Tag that is going to be stored.
+    pub tag_name: TagName,
+    /// Specifies the language of the tag specified, in the Matroska languages form; see basics on language codes. This Element **MUST** be ignored if the TagLanguageBCP47 Element is used within the same SimpleTag Element.
+    pub tag_language: TagLanguage,
+    /// The language used in the TagString, in the \[@!BCP47\] form; see basics on language codes. If this Element is used, then any TagLanguage Elements used in the same SimpleTag **MUST** be ignored.
+    pub tag_language_bcp47: Option<TagLanguageBcp47>,
+    /// A boolean value to indicate if this is the default/original language to use for the given tag.
+    pub tag_default: TagDefault,
+    /// The value of the Tag.
+    pub tag_string: Option<TagString>,
+    /// The values of the Tag, if it is binary. Note that this cannot be used in the same SimpleTag as TagString.
+    pub tag_binary: Option<TagBinary>,
+    /// Nested simple tags, if any.
+    pub simple_tag: Vec<SimpleTag>,
+}
+
+impl Element for SimpleTag {
+    const ID: VInt64 = VInt64::from_encoded(0x67C8);
+    nested! {
+      required: [ TagName, TagLanguage, TagDefault ],
+      optional: [ TagLanguageBcp47, TagString, TagBinary ],
+      multiple: [ SimpleTag ],
     }
 }
