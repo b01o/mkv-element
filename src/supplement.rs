@@ -45,7 +45,7 @@ impl Deref for Crc32 {
 impl Element for Crc32 {
     const ID: VInt64 = VInt64::from_encoded(0xBF);
     fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-        let buf = <[u8; 4]>::decode_exact(buf, 4)?;
+        let buf = <[u8; 4]>::decode(buf)?;
         Ok(Self(u32::from_le_bytes(buf)))
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {

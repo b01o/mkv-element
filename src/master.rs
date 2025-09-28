@@ -17,13 +17,18 @@ macro_rules! nested {
     (required: [$($required:ident),*$(,)?], optional: [$($optional:ident),*$(,)?], multiple: [$($multiple:ident),*$(,)?],) => {
         paste::paste! {
             fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-                let crc32 = Option::<Crc32>::decode(buf).ok().flatten();
+                let crc32 = if buf.len() > 6 && buf[0] == 0xBF && buf[1] == 0x84 {
+                    Some(Crc32::decode(buf)?)
+                } else {
+                    None
+                };
+
                 $( let mut [<$required:snake>] = None;)*
                 $( let mut [<$optional:snake>] = None;)*
                 $( let mut [<$multiple:snake>] = Vec::new();)*
                 let mut void: Option<Void> = None;
 
-                while let Ok(Some(header)) = Option::<Header>::decode(buf) {
+                while let Ok(header) = Header::decode(buf) {
                     match header.id {
                         $( $required::ID => {
                             if [<$required:snake>].is_some() {

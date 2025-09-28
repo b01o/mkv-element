@@ -41,7 +41,7 @@ impl<T: Element> Encode for T {
         self.encode_body(&mut body_buf)?;
         let header = Header {
             id: T::ID,
-            size: VInt64(body_buf.len() as u64),
+            size: VInt64::new(body_buf.len() as u64),
         };
         header.encode(buf)?;
         buf.append_slice(&body_buf);

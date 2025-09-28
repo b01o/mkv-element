@@ -39,6 +39,10 @@ pub enum Error {
         /// The parent master element ID.
         parent: VInt64,
     },
+
+    /// Element body size is unknown.
+    #[error("Element body size is unknown, ID: {0}")]
+    ElementBodySizeUnknown(VInt64),
 }
 
 /// Result type for this crate.

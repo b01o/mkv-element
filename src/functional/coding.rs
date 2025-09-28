@@ -1,5 +1,4 @@
 //! Encoding and decoding Element or other types from buffers in memory.
-use core::slice;
 
 use super::*;
 use crate::{Result, base::Header, element::Element, error::Error};
@@ -122,26 +121,6 @@ impl<T: Decode> Decode for Vec<T> {
     }
 }
 
-impl<T: Decode> Decode for Option<T> {
-    /// # Safety:
-    /// The buffer is not modified during decoding, as we holding a immutable reference to it.
-    ///
-    fn decode(buf: &mut &[u8]) -> Result<Self> {
-        if !buf.has_remaining() {
-            return Ok(None);
-        }
-
-        let initial_len = buf.len();
-        let ptr = buf.as_ptr();
-
-        let mut working_buf = unsafe { slice::from_raw_parts(ptr, initial_len) };
-        let out = T::decode(&mut working_buf)?;
-
-        *buf = working_buf;
-        Ok(Some(out))
-    }
-}
-
 /// Encode an element to a buffer.
 pub trait Encode {
     /// Encode self to the buffer.
@@ -237,29 +216,5 @@ impl<T: Encode> Encode for Vec<T> {
         }
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::base::VInt64;
-    use crate::functional::Decode;
-
-    // if decode fails, buf should be unchanged
-    #[test]
-    fn test_option_decode() {
-        let v = VInt64(42);
-        let mut encoded = vec![];
-        v.encode(&mut encoded).unwrap();
-        let mut slice_encoded = &encoded[..];
-
-        let opt_header = Option::<Header>::decode(&mut slice_encoded);
-
-        assert!(opt_header.is_err());
-        assert_ne!(slice_encoded.len(), 0);
-
-        let opt_vint = VInt64::decode(&mut slice_encoded).unwrap();
-        assert_eq!(opt_vint, v);
     }
 }
