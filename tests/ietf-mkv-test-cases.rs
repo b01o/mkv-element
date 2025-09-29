@@ -1,10 +1,8 @@
 use core::panic;
 use std::io::*;
 
-use mkv_element::element::Element;
-use mkv_element::io::ReadElement;
-use mkv_element::leaf::{Position, PrevSize, SimpleBlock, Timestamp};
-use mkv_element::{base::Header, io::ReadFrom, master::*};
+use mkv_element::io::blocking::*;
+use mkv_element::prelude::*;
 
 // This file is the absolute minimum a compliant player should be able to handle.
 // The sample comes from the Big Buck Bunny open project.

@@ -7,20 +7,6 @@ use crate::{Result, base::Header, element::Element, error::Error};
 pub trait Decode: Sized {
     /// Decode an element from the buffer.
     fn decode(buf: &mut &[u8]) -> Result<Self>;
-
-    /// Helper: Decode exactly size bytes from the buffer.
-    fn decode_exact(buf: &mut &[u8], size: usize) -> Result<Self> {
-        if buf.remaining() < size {
-            return Err(Error::OutOfBounds);
-        }
-        let mut inner = buf.slice(size);
-        let res = Self::decode(&mut inner)?;
-        if inner.has_remaining() {
-            return Err(Error::ShortRead);
-        }
-        buf.advance(size);
-        Ok(res)
-    }
 }
 
 /// Decode an element using the provided header

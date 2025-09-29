@@ -1,47 +1,141 @@
-use super::*;
-use crate::{base::Header, element::Element, functional::Encode};
-use std::io::{Read, Write};
+/// blocking I/O implementations, supporting reading and writing.
+pub mod blocking {
+    use crate::{
+        base::Header,
+        element::Element,
+        functional::Encode,
+        master::{Cluster, Segment},
+    };
+    use std::io::{Read, Write};
 
-/// Read a type from a reader.
-/// Can be implemented for types that can be read without knowing their size beforehand.
-pub trait ReadFrom: Sized {
-    /// Read Self from a reader.
-    fn read_from<R: Read>(r: &mut R) -> Result<Self>;
-}
+    /// Read from a reader.
+    pub trait ReadFrom: Sized {
+        /// Read Self from a reader.
+        fn read_from<R: Read>(r: &mut R) -> crate::Result<Self>;
+    }
 
-/// implemented for all `Element`s.
-pub trait ReadElement: Sized + Element {
     /// Read an element from a reader provided the header.
-    fn read_element<R: Read>(header: &Header, r: &mut R) -> Result<Self> {
-        let body = header.read_body(r)?;
-        Self::decode_body(&mut &body[..])
+    pub trait ReadElement: Sized + Element {
+        /// Read an element from a reader provided the header.
+        fn read_element<R: Read>(header: &Header, r: &mut R) -> crate::Result<Self> {
+            let body = header.read_body(r)?;
+            Self::decode_body(&mut &body[..])
+        }
+    }
+    impl<T: Element> ReadElement for T {}
+
+    impl Header {
+        /// Read the body of the element from a reader into memory.
+        pub(crate) fn read_body<R: Read>(&self, r: &mut R) -> crate::Result<Vec<u8>> {
+            // Segment and Cluster can have unknown size, but we don't support that here.
+            let size = if self.size.is_unknown && [Segment::ID, Cluster::ID].contains(&self.id) {
+                return Err(crate::Error::ElementBodySizeUnknown(self.id));
+            } else {
+                *self.size
+            };
+            // we allocate 4096 bytes upfront and grow as needed
+            let cap = size.min(4096) as usize;
+            let mut buf = Vec::with_capacity(cap);
+            let n = std::io::copy(&mut r.take(size), &mut buf)?;
+            if size != n {
+                return Err(crate::Error::OutOfBounds);
+            }
+            Ok(buf)
+        }
+    }
+
+    /// Write to a writer.
+    pub trait WriteTo {
+        /// Write to a writer.
+        fn write_to<W: Write>(&self, w: &mut W) -> crate::Result<()>;
+    }
+
+    impl<T: Encode> WriteTo for T {
+        fn write_to<W: Write>(&self, w: &mut W) -> crate::Result<()> {
+            //TODO should avoid the extra allocation here
+            let mut buf = vec![];
+            self.encode(&mut buf)?;
+            w.write_all(&buf)?;
+            Ok(())
+        }
     }
 }
-impl<T: Element> ReadElement for T {}
+/// tokio non-blocking I/O implementations, supporting async reading and writing.
+#[cfg(feature = "tokio")]
+pub mod tokio_impl {
+    use crate::{
+        base::Header,
+        element::Element,
+        master::{Cluster, Segment},
+    };
 
-/// Write to a writer.
-pub trait WriteTo {
-    /// Write an element to a writer.
-    fn write_to<W: Write>(&self, w: &mut W) -> Result<()>;
-}
+    use std::future::Future;
+    use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
-impl<T: Encode> WriteTo for T {
-    fn write_to<W: Write>(&self, w: &mut W) -> Result<()> {
-        //TODO should avoid the extra allocation here
-        let mut buf = vec![];
-        self.encode(&mut buf)?;
-        w.write_all(&buf)?;
-        Ok(())
+    /// Read from a reader asynchronously.
+    pub trait AsyncReadFrom: Sized {
+        /// Read Self from a reader.
+        fn async_read_from<R: tokio::io::AsyncRead + Unpin>(
+            r: &mut R,
+        ) -> impl Future<Output = crate::Result<Self>>;
+    }
+
+    /// Read an element from a reader provided the header asynchronously.
+    pub trait AsyncReadElement: Sized + Element {
+        /// Read an element from a reader provided the header.
+        fn async_read_element<R: tokio::io::AsyncRead + Unpin>(
+            header: &Header,
+            r: &mut R,
+        ) -> impl std::future::Future<Output = crate::Result<Self>> {
+            async {
+                let body = header.read_body_tokio(r).await?;
+                Self::decode_body(&mut &body[..])
+            }
+        }
+    }
+    impl<T: Element> AsyncReadElement for T {}
+
+    /// Write to a writer asynchronously.
+    pub trait AsyncWriteTo {
+        /// Write to a writer asynchronously.
+        fn async_write_to<W: tokio::io::AsyncWrite + Unpin>(
+            &self,
+            w: &mut W,
+        ) -> impl std::future::Future<Output = crate::Result<()>>;
+    }
+
+    impl<T: crate::functional::Encode> AsyncWriteTo for T {
+        async fn async_write_to<W: tokio::io::AsyncWrite + Unpin>(
+            &self,
+            w: &mut W,
+        ) -> crate::Result<()> {
+            //TODO should avoid the extra allocation here
+            let mut buf = vec![];
+            self.encode(&mut buf)?;
+            Ok(w.write_all(&buf).await?)
+        }
+    }
+
+    impl Header {
+        /// Read the body of the element from a reader into memory.
+        pub(crate) async fn read_body_tokio<R: AsyncRead + Unpin>(
+            &self,
+            r: &mut R,
+        ) -> crate::Result<Vec<u8>> {
+            // Segment and Cluster can have unknown size, but we don't support that here.
+            let size = if self.size.is_unknown && [Segment::ID, Cluster::ID].contains(&self.id) {
+                return Err(crate::Error::ElementBodySizeUnknown(self.id));
+            } else {
+                *self.size
+            };
+            // we allocate 4096 bytes upfront and grow as needed
+            let cap = size.min(4096) as usize;
+            let mut buf = Vec::with_capacity(cap);
+            let n = tokio::io::copy(&mut r.take(size), &mut buf).await?;
+            if size != n {
+                return Err(crate::Error::OutOfBounds);
+            }
+            Ok(buf)
+        }
     }
 }
-
-/// Extension trait for `std::io::Read` to read primitive types.
-pub trait ReadExt: Read {
-    /// Read a single byte.
-    fn read_u8(&mut self) -> Result<u8> {
-        let mut buf = [0u8; 1];
-        self.read_exact(&mut buf)?;
-        Ok(buf[0])
-    }
-}
-impl<T: Read> ReadExt for T {}

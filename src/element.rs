@@ -1,7 +1,7 @@
 use crate::base::*;
 use crate::error::Error;
 use crate::functional::*;
-use crate::io::ReadFrom;
+use crate::io::blocking::*;
 
 /// A Matroska element.
 pub trait Element: Sized {
@@ -61,6 +61,21 @@ impl<T: Element> ReadFrom for T {
     fn read_from<R: std::io::Read>(r: &mut R) -> crate::Result<Self> {
         let header = Header::read_from(r)?;
         let body = header.read_body(r)?;
+        let element = match T::decode_body(&mut &body[..]) {
+            Ok(e) => e,
+            Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),
+            Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
+            Err(e) => return Err(e),
+        };
+        Ok(element)
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl<T: Element> crate::io::tokio_impl::AsyncReadFrom for T {
+    async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
+        let header = Header::async_read_from(r).await?;
+        let body = header.read_body_tokio(r).await?;
         let element = match T::decode_body(&mut &body[..]) {
             Ok(e) => e,
             Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),

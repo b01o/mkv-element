@@ -1,13 +1,8 @@
-use crate::element::Element;
 use crate::error::Error;
 use crate::functional::*;
-use crate::io::ReadExt;
-use crate::io::ReadFrom;
-use crate::master::Cluster;
-use crate::master::Segment;
+use crate::io::blocking::*;
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::io::Read;
 use std::ops::Deref;
 
 /// A variable-length integer RFC 8794
@@ -129,7 +124,9 @@ impl VInt64 {
 
 impl ReadFrom for VInt64 {
     fn read_from<R: std::io::Read>(r: &mut R) -> crate::Result<Self> {
-        let first_byte = r.read_u8()?;
+        let mut first_byte_buf = [0u8; 1];
+        r.read_exact(&mut first_byte_buf)?;
+        let first_byte = first_byte_buf[0];
         if first_byte == 0xFF {
             return Ok(VInt64 {
                 value: 127,
@@ -151,6 +148,44 @@ impl ReadFrom for VInt64 {
             let mut buf = [0u8; 8];
             let read_buf = &mut buf[8 - leading_zeros..];
             r.read_exact(read_buf)?;
+            if leading_zeros != 7 {
+                buf[8 - leading_zeros - 1] = first_byte & (0xFF >> (leading_zeros + 1));
+            }
+            Ok(VInt64 {
+                value: u64::from_be_bytes(buf),
+                is_unknown: false,
+            })
+        }
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl crate::io::tokio_impl::AsyncReadFrom for VInt64 {
+    async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
+        let mut first_byte_buf = [0u8; 1];
+        tokio::io::AsyncReadExt::read_exact(r, &mut first_byte_buf).await?;
+        let first_byte = first_byte_buf[0];
+        if first_byte == 0xFF {
+            return Ok(VInt64 {
+                value: 127,
+                is_unknown: true,
+            });
+        }
+
+        let leading_zeros = first_byte.leading_zeros() as usize;
+        if leading_zeros >= 8 {
+            return Err(crate::error::Error::InvalidVInt);
+        }
+
+        if leading_zeros == 0 {
+            Ok(VInt64 {
+                value: (first_byte & 0b0111_1111) as u64,
+                is_unknown: false,
+            })
+        } else {
+            let mut buf = [0u8; 8];
+            let read_buf = &mut buf[8 - leading_zeros..];
+            tokio::io::AsyncReadExt::read_exact(r, read_buf).await?;
             if leading_zeros != 7 {
                 buf[8 - leading_zeros - 1] = first_byte & (0xFF >> (leading_zeros + 1));
             }
@@ -354,29 +389,19 @@ pub struct Header {
     pub size: VInt64,
 }
 
-impl Header {
-    pub(crate) fn read_body<R: Read>(&self, r: &mut R) -> crate::Result<Vec<u8>> {
-        // Segment and Cluster can have unknown size, but we don't support that here.
-        let size = if self.size.is_unknown && [Segment::ID, Cluster::ID].contains(&self.id) {
-            return Err(Error::ElementBodySizeUnknown(self.id));
-        } else {
-            *self.size
-        };
-        // we allocate 4096 bytes upfront and grow as needed
-        let cap = size.min(4096) as usize;
-        let mut buf = Vec::with_capacity(cap);
-        let n = std::io::copy(&mut r.take(size), &mut buf)?;
-        if size != n {
-            return Err(Error::OutOfBounds);
-        }
-        Ok(buf)
-    }
-}
-
 impl ReadFrom for Header {
     fn read_from<R: std::io::Read>(reader: &mut R) -> crate::Result<Self> {
         let id = VInt64::read_from(reader)?;
         let size = VInt64::read_from(reader)?;
+        Ok(Self { id, size })
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl crate::io::tokio_impl::AsyncReadFrom for Header {
+    async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
+        let id = VInt64::async_read_from(r).await?;
+        let size = VInt64::async_read_from(r).await?;
         Ok(Self { id, size })
     }
 }
