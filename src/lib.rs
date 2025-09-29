@@ -12,6 +12,7 @@ pub mod io;
 
 /// base types for Matroska elements. ie. `VInt64`, `Header`, etc.
 mod base;
+mod frame;
 /// Leaf elements in Matroska.
 mod leaf;
 /// Master elements in Matroska.
@@ -27,6 +28,7 @@ mod element;
 pub mod prelude {
     pub use crate::base::*;
     pub use crate::element::*;
+    pub use crate::frame::*;
     pub use crate::leaf::*;
     pub use crate::master::*;
     pub use crate::supplement::*;

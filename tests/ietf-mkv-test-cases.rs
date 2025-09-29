@@ -43,7 +43,10 @@ fn ietf_test_1() {
 
     // It contains MPEG4.2 (DivX) video, (854x480) MP3 audio, uses only SimpleBlock (matroska DocType v2)
     assert!(
-        segment.cluster.iter().all(|c| c.block_group.is_empty()),
+        segment.cluster.iter().all(|c| c
+            .blocks
+            .iter()
+            .all(|b| matches!(b, ClusterBlock::Simple(_)))),
         "All clusters should use SimpleBlock only"
     );
 
@@ -154,10 +157,6 @@ fn ietf_test_3() {
             "Matroska Validation File 3, header stripping on the video track and no SimpleBlock"
         ))
     );
-    assert!(
-        segment.cluster.iter().all(|c| !c.simple_block.is_empty()),
-        "All clusters use SimpleBlock only"
-    );
 
     // It contains H264 (1024x576 pixels), and stereo MP3.
     let tracks = segment.tracks.as_ref().unwrap();
@@ -261,14 +260,16 @@ fn ietf_test_4() {
                                 Some(PrevSize::read_element(&header, &mut file).unwrap());
                         }
                         SimpleBlock::ID => {
-                            cluster
-                                .simple_block
-                                .push(SimpleBlock::read_element(&header, &mut file).unwrap());
+                            cluster.blocks.push(
+                                SimpleBlock::read_element(&header, &mut file)
+                                    .unwrap()
+                                    .into(),
+                            );
                         }
                         BlockGroup::ID => {
                             cluster
-                                .block_group
-                                .push(BlockGroup::read_element(&header, &mut file).unwrap());
+                                .blocks
+                                .push(BlockGroup::read_element(&header, &mut file).unwrap().into());
                         }
                         _ => {
                             // unexpected element skip
