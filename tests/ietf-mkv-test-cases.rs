@@ -8,6 +8,7 @@ use mkv_element::prelude::*;
 // The sample comes from the Big Buck Bunny open project.
 // It contains MPEG4.2 (DivX) video, (854x480) MP3 audio, uses only SimpleBlock (matroska DocType v2)
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_1() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test1.mkv").unwrap();
     let _ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -75,6 +76,7 @@ fn ietf_test_1() {
 // This file also contains CRC-32 values in the EBML header, the MetaSeek, the Segment Info, the Tracks and the Tags and PrevSize/Position in the Clusters for better error recovery.
 // It contains H264 (1024x576 pixels), and stereo AAC. The source material is taken from the Elephant Dreams video project
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_2() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test2.mkv").unwrap();
     let ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -119,6 +121,7 @@ fn ietf_test_2() {
 // These 2 bytes have to be put back in the frame before decoding. his file also contains CRC-32 values in the EBML header, the MetaSeek, the Segment Info, the Tracks and the Tags and PrevSize/Position in the Clusters for better error recovery.
 // It contains H264 (1024x576 pixels), and stereo MP3. The source material is taken from the Elephant Dreams video project
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_3() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test3.mkv").unwrap();
     let ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -184,6 +187,7 @@ fn ietf_test_3() {
 // The sample comes from the Big Buck Bunny open project. It contains Theora video (1280x720), Vorbis audio, uses only SimpleBlock (matroska DocType v2)
 // A similar file can be created with mkclean using the "--live" option
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_4() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test4.mkv").unwrap();
     let _ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -304,6 +308,7 @@ fn ietf_test_4() {
 // The sample contains H264 (1024x576 pixels), and stereo AAC and commentary in AAC+ (using SBR).
 // The source material is taken from the Elephant Dreams video project
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_5() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test5.mkv").unwrap();
     let _ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -380,6 +385,7 @@ fn ietf_test_5() {
 // The size of the Segment and Block/SimpleBlock is coded using 1 (or the minimum possible the size) and 8 bytes randomly.
 // The file also have no Cues entry. So seeking should be disabled or look for Cluster boundaries in the stream (much slower than using Cues).
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_6() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test6.mkv").unwrap();
     let _ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -418,6 +424,7 @@ fn ietf_test_6() {
 // This file contains junk elements (elements not defined in the specs) either at the beginning or the end of Clusters.
 // These elements should be skipped. There is also an invalid element at 451417 that should be skipped until the next valid Cluster is found.
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_7() {
     let mut file = std::fs::File::open("matroska-test-files/test_files/test7.mkv").unwrap();
     let _ebml_head = Ebml::read_from(&mut file).unwrap();
@@ -432,6 +439,7 @@ fn ietf_test_7() {
 // The playback should not stop, and if possible the video should not be skipped where the audio is missing
 // The sample contains H264 (1024x576 pixels), and stereo AAC. The source material is taken from the Elephant Dreams video project
 #[test]
+#[ignore = "this test requires the matroska-test-files submodule"]
 fn ietf_test_8() {
     // The sample contains H264 (1024x576 pixels), and stereo AAC. The source material is taken from the Elephant Dreams video project
     let mut file = std::fs::File::open("matroska-test-files/test_files/test8.mkv").unwrap();
