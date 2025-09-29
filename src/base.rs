@@ -160,6 +160,7 @@ impl ReadFrom for VInt64 {
 }
 
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl crate::io::tokio_impl::AsyncReadFrom for VInt64 {
     async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
         let mut first_byte_buf = [0u8; 1];
@@ -398,6 +399,7 @@ impl ReadFrom for Header {
 }
 
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl crate::io::tokio_impl::AsyncReadFrom for Header {
     async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
         let id = VInt64::async_read_from(r).await?;

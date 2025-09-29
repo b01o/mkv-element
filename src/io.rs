@@ -62,6 +62,7 @@ pub mod blocking_impl {
 }
 /// tokio non-blocking I/O implementations, supporting async reading and writing.
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 pub mod tokio_impl {
     use crate::{
         base::Header,

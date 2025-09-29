@@ -1,6 +1,6 @@
 [package]
 name    = "mkv-element"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2024"
 authors     = ["b01o <b01o@proton.me>"]
 repository  = "https://github.com/b01o/mkv-element"
@@ -32,3 +32,8 @@ hexf      = "0.2.1"
 
 [package.metadata.cargo-shear]
 ignored = ["tokio-test"]
+
+[package.metadata.docs.rs]
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

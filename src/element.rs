@@ -72,6 +72,7 @@ impl<T: Element> ReadFrom for T {
 }
 
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl<T: Element> crate::io::tokio_impl::AsyncReadFrom for T {
     async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
         let header = Header::async_read_from(r).await?;
