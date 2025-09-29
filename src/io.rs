@@ -1,5 +1,5 @@
 /// blocking I/O implementations, supporting reading and writing.
-pub mod blocking {
+pub mod blocking_impl {
     use crate::{
         base::Header,
         element::Element,

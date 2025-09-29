@@ -1,7 +1,7 @@
 use crate::base::*;
 use crate::error::Error;
 use crate::functional::*;
-use crate::io::blocking::*;
+use crate::io::blocking_impl::*;
 
 /// A Matroska element.
 pub trait Element: Sized {

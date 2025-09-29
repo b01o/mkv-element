@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::functional::*;
-use crate::io::blocking::*;
+use crate::io::blocking_impl::*;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::ops::Deref;

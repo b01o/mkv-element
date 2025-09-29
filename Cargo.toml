@@ -1,12 +1,11 @@
 [package]
 name    = "mkv-element"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
-
 authors     = ["b01o <b01o@proton.me>"]
 repository  = "https://github.com/b01o/mkv-element"
-license     = "MIT OR Apache-2.0"
-description = "[WIP]"
+license     = "MIT"
+description = "A Matroska/WebM element reader and writer."
 
 [dependencies]
 thiserror = "2"
@@ -23,8 +22,13 @@ tokio = ["dep:tokio"]
 
 [dev-dependencies]
 roxmltree = "0.20.0"
+tokio-test = "0.4.4"
 tokio     = { version = "1.47", features = ["full"] }
+mkv-element = { path = ".", features = ["tokio"] }
 
 [build-dependencies]
 roxmltree = "0.20.0"
 hexf      = "0.2.1"
+
+[package.metadata.cargo-shear]
+ignored = ["tokio-test"]

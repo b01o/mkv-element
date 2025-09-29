@@ -1,7 +1,7 @@
 use core::panic;
 use std::io::*;
 
-use mkv_element::io::blocking::*;
+use mkv_element::io::blocking_impl::*;
 use mkv_element::prelude::*;
 
 // This file is the absolute minimum a compliant player should be able to handle.
