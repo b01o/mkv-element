@@ -5,9 +5,17 @@ use crate::io::ReadFrom;
 
 /// A Matroska element.
 pub trait Element: Sized {
+    /// EBML ID of the element.
     const ID: VInt64;
+    /// Whether the element has a default value, as per Matroska specification.
+    /// If true, and the element is missing in a master element, it should be treated as if it were present with the default value.
+    /// If false, and the element is missing in a master element, it should be treated as an error.
     const HAS_DEFAULT_VALUE: bool = false;
+
+    /// Decode the body of the element from a buffer.
     fn decode_body(buf: &mut &[u8]) -> crate::Result<Self>;
+
+    /// Encode the body of the element to a buffer.
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()>;
 }
 

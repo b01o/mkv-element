@@ -19,12 +19,6 @@ pub trait ReadElement: Sized + Element {
 }
 impl<T: Element> ReadElement for T {}
 
-/// Read until Self is found
-pub trait ReadUntil: Sized {
-    /// Read until Self is found
-    fn read_until<R: Read>(r: &mut R) -> Result<Self>;
-}
-
 /// Write to a writer.
 pub trait WriteTo {
     /// Write an element to a writer.

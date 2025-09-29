@@ -1,7 +1,10 @@
+use crate::element::Element;
 use crate::error::Error;
 use crate::functional::*;
 use crate::io::ReadExt;
 use crate::io::ReadFrom;
+use crate::master::Cluster;
+use crate::master::Segment;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::io::Read;
@@ -353,12 +356,13 @@ pub struct Header {
 
 impl Header {
     pub(crate) fn read_body<R: Read>(&self, r: &mut R) -> crate::Result<Vec<u8>> {
-        // we allocate 4096 bytes upfront and grow as needed
-        let size = if self.size.is_unknown {
+        // Segment and Cluster can have unknown size, but we don't support that here.
+        let size = if self.size.is_unknown && [Segment::ID, Cluster::ID].contains(&self.id) {
             return Err(Error::ElementBodySizeUnknown(self.id));
         } else {
             *self.size
         };
+        // we allocate 4096 bytes upfront and grow as needed
         let cap = size.min(4096) as usize;
         let mut buf = Vec::with_capacity(cap);
         let n = std::io::copy(&mut r.take(size), &mut buf)?;

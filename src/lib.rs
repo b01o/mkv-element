@@ -21,4 +21,5 @@ pub mod master;
 /// These elements are not from the Matroska specification, but Matroska specifications inherit them from EBML specifications.
 pub mod supplement;
 
-mod element;
+/// Element body definitions and traits.
+pub mod element;
