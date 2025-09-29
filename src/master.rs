@@ -29,6 +29,9 @@ macro_rules! nested {
                 let mut void: Option<Void> = None;
 
                 while let Ok(header) = Header::decode(buf) {
+                    if *header.size > buf.len() as u64 {
+                        return Err(Error::OverDecode(header.id));
+                    }
                     match header.id {
                         $( $required::ID => {
                             if [<$required:snake>].is_some() {
