@@ -16,14 +16,14 @@ mod supplement; // Supplementary elements in Matroska. Void elements, CRC-32, et
 pub mod io;
 
 // Re-export common types
+pub use crate::frame::*;
+pub use crate::lacer::*;
 pub use error::*;
 
 /// A prelude for common types and traits.
 pub mod prelude {
     pub use crate::base::*;
     pub use crate::element::*;
-    pub use crate::frame::*;
-    pub use crate::lacer::*;
     pub use crate::leaf::*;
     pub use crate::master::*;
     pub use crate::supplement::*;

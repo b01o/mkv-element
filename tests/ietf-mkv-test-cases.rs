@@ -1,6 +1,7 @@
 use core::panic;
 use std::io::*;
 
+use mkv_element::ClusterBlock;
 use mkv_element::io::blocking_impl::*;
 use mkv_element::prelude::*;
 
