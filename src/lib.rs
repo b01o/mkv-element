@@ -1,5 +1,4 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![feature(iter_macro, yield_expr)]
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 

@@ -42,64 +42,56 @@ impl Lacer {
     }
 
     /// Decode a laced block into individual frames
-    pub fn delace<'a>(&self, data: &'a [u8]) -> impl Iterator<Item = crate::Result<&'a [u8]>> {
-        // Note: Using `std::iter::iter` and `yield` to create a generator-like iterator.
-        // This requires the nightly feature `iter_macro` and `yield_expr`.
-        // The call is necessary to actually invoke the generator
-        #[allow(clippy::redundant_closure_call)]
-        std::iter::iter!(move || {
-            match self {
-                Lacer::Xiph => {
-                    if data.is_empty() {
-                        return;
-                    }
+    pub fn delace<'a>(&self, data: &'a [u8]) -> crate::Result<Vec<&'a [u8]>> {
+        // TODO(perf): avoid heap allocations ideally
+        // we should be able to return a `impl Iterator<Item = crate::Result<&'a [u8]>>` here
+        // can make it work using nightly features like `generators`.
+        // but not sure how to do that with the current stable Rust.
 
-                    let num_frames = data[0] as usize + 1;
-                    if num_frames == 1 {
-                        yield Ok(&data[1..]);
-                        return;
-                    }
-
-                    let data_start_pos = data
-                        .iter()
-                        .enumerate()
-                        .skip(1)
-                        .filter(|(_, b)| **b != 0xFF)
-                        .nth(num_frames - 2)
-                        .map(|(i, _)| i);
-
-                    let data_start_pos = match data_start_pos {
-                        Some(pos) => pos + 1,
-                        None => {
-                            yield Err(Error::MalformedLacingData);
-                            return;
-                        }
-                    };
-
-                    let laced_data = match data.get(data_start_pos..) {
-                        Some(d) => d,
-                        None => {
-                            yield Err(Error::MalformedLacingData);
-                            return;
-                        }
-                    };
-
-                    let mut start = 0;
-                    for size in data[1..data_start_pos]
-                        .split_inclusive(|b| *b != 0xFF)
-                        .map(|chunk| chunk.iter().map(|b| *b as usize).sum::<usize>())
-                    {
-                        yield laced_data
-                            .get(start..start + size)
-                            .ok_or(Error::MalformedLacingData);
-                        start += size;
-                    }
-                    yield laced_data.get(start..).ok_or(Error::MalformedLacingData);
+        match self {
+            Lacer::Xiph => {
+                if data.is_empty() {
+                    return Ok(vec![]);
                 }
-                Lacer::FixedSize => todo!("implement fixed-size delacing"),
-                Lacer::Ebml => todo!("implement EBML delacing"),
+
+                let num_frames = data[0] as usize + 1;
+                if num_frames == 1 {
+                    return Ok(vec![&data[1..]]);
+                }
+                let mut out = Vec::with_capacity(num_frames);
+
+                let data_start_pos = data
+                    .iter()
+                    .enumerate()
+                    .skip(1)
+                    .filter(|(_, b)| **b != 0xFF)
+                    .nth(num_frames - 2)
+                    .map(|(i, _)| i)
+                    .ok_or(Error::MalformedLacingData)?
+                    + 1;
+
+                let laced_data = data
+                    .get(data_start_pos..)
+                    .ok_or(Error::MalformedLacingData)?;
+
+                let mut start = 0;
+                for size in data[1..data_start_pos]
+                    .split_inclusive(|b| *b != 0xFF)
+                    .map(|chunk| chunk.iter().map(|b| *b as usize).sum::<usize>())
+                {
+                    out.push(
+                        laced_data
+                            .get(start..start + size)
+                            .ok_or(Error::MalformedLacingData)?,
+                    );
+                    start += size;
+                }
+                out.push(laced_data.get(start..).ok_or(Error::MalformedLacingData)?);
+                Ok(out)
             }
-        })()
+            Lacer::FixedSize => todo!("implement fixed-size delacing"),
+            Lacer::Ebml => todo!("implement EBML delacing"),
+        }
     }
 }
 
@@ -118,7 +110,7 @@ mod lacer_tests {
         // 0 frames
         let laced = Lacer::Xiph.lace(&[]);
         assert_eq!(laced, vec![]);
-        let frames: Vec<_> = Lacer::Xiph.delace(&[]).collect();
+        let frames: Vec<_> = Lacer::Xiph.delace(&[]).unwrap();
         assert_eq!(frames.len(), 0);
 
         // 4 frames, sizes: 255, 256, 1, remaining
@@ -132,12 +124,12 @@ mod lacer_tests {
         let data = [len, frame0, frame1, frame2, frame3].concat();
         assert_eq!(laced, data);
 
-        let frames: Vec<_> = Lacer::Xiph.delace(&data).collect();
+        let frames: Vec<_> = Lacer::Xiph.delace(&data).unwrap();
         assert_eq!(frames.len(), 4);
-        assert_eq!(frames[0].as_ref().unwrap(), &[2u8; 255]);
-        assert_eq!(frames[1].as_ref().unwrap(), &[42u8; 256]);
-        assert_eq!(frames[2].as_ref().unwrap(), &[38u8; 1]);
-        assert_eq!(frames[3].as_ref().unwrap(), &[100u8; 1]);
+        assert_eq!(frames[0], &[2u8; 255]);
+        assert_eq!(frames[1], &[42u8; 256]);
+        assert_eq!(frames[2], &[38u8; 1]);
+        assert_eq!(frames[3], &[100u8; 1]);
 
         // 1 frame, size: remaining
         let len = vec![0x00];
@@ -147,9 +139,9 @@ mod lacer_tests {
         let data = [len, frame0].concat();
         assert_eq!(laced, data);
 
-        let frames: Vec<_> = Lacer::Xiph.delace(&data).collect();
+        let frames: Vec<_> = Lacer::Xiph.delace(&data).unwrap();
         assert_eq!(frames.len(), 1);
-        assert_eq!(frames[0].as_ref().unwrap(), &[2u8; 255]);
+        assert_eq!(frames[0], &[2u8; 255]);
 
         // 2 frames, sizes: 32, remaining
         let len = vec![0x01, 0x20];
@@ -160,10 +152,10 @@ mod lacer_tests {
         let data = [len, frame0, frame1].concat();
         assert_eq!(laced, data);
 
-        let frames: Vec<_> = Lacer::Xiph.delace(&data).collect();
+        let frames: Vec<_> = Lacer::Xiph.delace(&data).unwrap();
         assert_eq!(frames.len(), 2);
-        assert_eq!(frames[0].as_ref().unwrap(), &[2u8; 32]);
-        assert_eq!(frames[1].as_ref().unwrap(), &[42u8; 256]);
+        assert_eq!(frames[0], &[2u8; 32]);
+        assert_eq!(frames[1], &[42u8; 256]);
 
         // 4 frames, sizes: 600, 3, 520, remaining
         let len = vec![0x03, 0xFF, 0xFF, 0x5A, 0x3, 0xFF, 0xFF, 0xA];
@@ -178,11 +170,11 @@ mod lacer_tests {
         let data = [len, frame0, frame1, frame2, frame3].concat();
         assert_eq!(laced, data);
 
-        let frames: Vec<_> = Lacer::Xiph.delace(&data).collect();
+        let frames: Vec<_> = Lacer::Xiph.delace(&data).unwrap();
         assert_eq!(frames.len(), 4);
-        assert_eq!(frames[0].as_ref().unwrap(), &[2u8; 600]);
-        assert_eq!(frames[1].as_ref().unwrap(), &[42u8; 3]);
-        assert_eq!(frames[2].as_ref().unwrap(), &[38u8; 520]);
-        assert_eq!(frames[3].as_ref().unwrap(), &[100u8; 1]);
+        assert_eq!(frames[0], &[2u8; 600]);
+        assert_eq!(frames[1], &[42u8; 3]);
+        assert_eq!(frames[2], &[38u8; 520]);
+        assert_eq!(frames[3], &[100u8; 1]);
     }
 }
