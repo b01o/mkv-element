@@ -1,3 +1,5 @@
+//! I/O utilities.
+
 /// blocking I/O implementations, supporting reading and writing.
 pub mod blocking_impl {
     use crate::{

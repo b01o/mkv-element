@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::base::*;
 use crate::element::*;
+use crate::frame::ClusterBlock;
 use crate::functional::*;
 use crate::leaf::*;
 use crate::supplement::*;
@@ -293,18 +294,118 @@ pub struct Cluster {
     pub position: Option<Position>,
     /// Size of the previous Cluster, in octets. Can be useful for backward playing.
     pub prev_size: Option<PrevSize>,
-    /// Similar to Block, see [basics](https://www.matroska.org/technical/basics.html#block-structure), but without all the extra information, mostly used to reduced overhead when no extra feature is needed; see basics on SimpleBlock Structure.
-    pub simple_block: Vec<SimpleBlock>,
-    /// Basic container of information containing a single Block and information specific to that Block.
-    pub block_group: Vec<BlockGroup>,
+    /// One or more blocks of data (see Block and SimpleBlock) and their associated data (see BlockGroup).
+    pub blocks: Vec<ClusterBlock>,
 }
 
+// Here we manually implement Element for Cluster, aggregating both SimpleBlock and BlockGroup into ClusterBlock, preserving their order.
 impl Element for Cluster {
     const ID: VInt64 = VInt64::from_encoded(0x1F43B675);
-    nested! {
-      required: [ Timestamp ],
-      optional: [ Position, PrevSize ],
-      multiple: [ SimpleBlock, BlockGroup ],
+    fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+        let crc32 = if buf.len() > 6 && buf[0] == 0xBF && buf[1] == 0x84 {
+            Some(Crc32::decode(buf)?)
+        } else {
+            None
+        };
+
+        let mut timestamp = None;
+        let mut position = None;
+        let mut prev_size = None;
+        let mut blocks = Vec::new();
+
+        let mut void: Option<Void> = None;
+
+        while let Ok(header) = Header::decode(buf) {
+            if *header.size > buf.len() as u64 {
+                return Err(Error::OverDecode(header.id));
+            }
+            match header.id {
+                Timestamp::ID => {
+                    if timestamp.is_some() {
+                        return Err(Error::DuplicateElement {
+                            id: header.id,
+                            parent: Self::ID,
+                        });
+                    } else {
+                        timestamp = Some(Timestamp::decode_element(&header, buf)?)
+                    }
+                }
+                Position::ID => {
+                    if position.is_some() {
+                        return Err(Error::DuplicateElement {
+                            id: header.id,
+                            parent: Self::ID,
+                        });
+                    } else {
+                        position = Some(Position::decode_element(&header, buf)?)
+                    }
+                }
+                PrevSize::ID => {
+                    if prev_size.is_some() {
+                        return Err(Error::DuplicateElement {
+                            id: header.id,
+                            parent: Self::ID,
+                        });
+                    } else {
+                        prev_size = Some(PrevSize::decode_element(&header, buf)?)
+                    }
+                }
+                SimpleBlock::ID => {
+                    blocks.push(SimpleBlock::decode_element(&header, buf)?.into());
+                }
+                BlockGroup::ID => {
+                    blocks.push(BlockGroup::decode_element(&header, buf)?.into());
+                }
+                Void::ID => {
+                    let v = Void::decode_element(&header, buf)?;
+                    if let Some(previous) = void {
+                        void = Some(Void {
+                            size: previous.size + v.size,
+                        });
+                    } else {
+                        void = Some(v);
+                    }
+                    log::info!(
+                        "Skipping Void element in Element {}, size: {}B",
+                        Self::ID,
+                        *header.size
+                    );
+                }
+                _ => {
+                    buf.advance(*header.size as usize);
+                    log::warn!(
+                        "Unknown element {}({}b) in Element({})",
+                        header.id,
+                        *header.size,
+                        Self::ID
+                    );
+                }
+            }
+        }
+
+        if buf.has_remaining() {
+            return Err(Error::ShortRead);
+        }
+
+        Ok(Self {
+            crc32,
+            timestamp: timestamp.ok_or(Error::MissingElement(Timestamp::ID))?,
+            position,
+            prev_size,
+            blocks,
+            void,
+        })
+    }
+
+    fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+        self.crc32.encode(buf)?;
+        self.timestamp.encode(buf)?;
+        self.position.encode(buf)?;
+        self.prev_size.encode(buf)?;
+        self.blocks.encode(buf)?;
+
+        self.void.encode(buf)?;
+        Ok(())
     }
 }
 

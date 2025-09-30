@@ -43,6 +43,10 @@ pub enum Error {
     /// Element body size is unknown.
     #[error("Element body size is unknown, ID: {0}")]
     ElementBodySizeUnknown(VInt64),
+
+    /// Malformed lacing data.
+    #[error("Malformed lacing data")]
+    MalformedLacingData,
 }
 
 /// Result type for this crate.
