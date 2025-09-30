@@ -1,34 +1,30 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![feature(iter_macro, yield_expr)]
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
-/// Error types for this crate.
+mod base; // base types for Matroska elements. ie. `VInt64`, `Header`, etc.
+mod element; // Element body definitions and traits.
 mod error;
+mod frame;
 mod functional;
-pub use error::*;
+mod lacer;
+mod leaf; // Leaf elements in Matroska.
+mod master; // Master elements in Matroska.
+mod supplement; // Supplementary elements in Matroska. Void elements, CRC-32, etc.
 
-/// I/O utilities.
+// following modules are public
 pub mod io;
 
-/// base types for Matroska elements. ie. `VInt64`, `Header`, etc.
-mod base;
-mod frame;
-/// Leaf elements in Matroska.
-mod leaf;
-/// Master elements in Matroska.
-mod master;
-/// Supplementary elements in Matroska. Void elements, CRC-32, etc.
-///
-/// These elements are not from the Matroska specification, but Matroska specifications inherit them from EBML specifications.
-mod supplement;
-// Element body definitions and traits.
-mod element;
+// Re-export common types
+pub use error::*;
 
 /// A prelude for common types and traits.
 pub mod prelude {
     pub use crate::base::*;
     pub use crate::element::*;
     pub use crate::frame::*;
+    pub use crate::lacer::*;
     pub use crate::leaf::*;
     pub use crate::master::*;
     pub use crate::supplement::*;
