@@ -5,28 +5,19 @@
 # mkv-element
 A Rust library for reading and writing Matroska/WebM (MKV) elements.
 
-## Highlights
-- *Simple* API to work with
-- Efficient in-memory parsing and serialization of MKV elements
-- Flexible I/O support for both synchronous and asynchronous operations
-- High-performance zero-copy data handling with minimal allocations
+This library provides a simple and efficient way to parse and serialize MKV elements both in memory and on disk, with support for both blocking and asynchronous I/O operations.
 
-## Elements
-MKV files are made of elements, which can be of different types:
-- Master elements: containers for other elements (like folders)
-- Leaf elements: contain a single value of a specific type:
-    - Unsigned integers
-    - Signed integers
-    - Floating point numbers
-    - Strings (UTF-8/ASCII)
-    - Binary data
-    - Dates (timestamps in nanoseconds offset to 2001-01-01T00:00:00.000000000 UTC)
+First and foremost, the library provides [`Header`](crate::prelude::Header) struct to read and write the element header (ID and size), and all MKV elements defined in the [Matroska specifications] as Rust structs with typed fields. All elements implement the [`Element`](crate::prelude::Element) trait, which provides methods for reading and writing the element body and [EBML ID](crate::prelude::Element::ID) for identifying the element type. As a convenience, a [`prelude`](crate::prelude) module is provided to bring all the types into scope.
 
-See the [Matroska specifications](https://www.matroska.org/technical/elements.html).
+To read an element, you can either use the element's [`read_from()`] method to read the entire element (header + body) from a type implementing [`std::io::Read`], or read the header first using `Header::read_from()` followed by `Element::read_element` to read the body. The latter is useful when you don't know the element type in advance. To write an element, you can use the element's [`write_to()`] method to write the entire element (header + body) to a type implementing [`std::io::Write`].
 
-## Matroska/Webm Container aka. EBML
+Asynchronous I/O is supported with the `tokio` feature enabled. The [`async_read_from()`], [`async_read_element()`], and [`async_write_to()`] methods are to work with types implementing [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] respectively.
 
-Mkv/WebM files start with an EBML header, followed by one or more segments containing the actual media data and metadata.
+All non-master elements in this crate implements the `Deref` trait, allowing easy access to the inner value. For example, if you have an `UnsignedInteger` element, you can access its value directly using the `*` operator or by calling `.deref()`.
+
+
+# Primer on MKV/WebM (EBML) Structure
+EBML([Extensible Binary Meta Language]) is a binary format similar to XML, but more efficient and flexible. It is used as the underlying format for Matroska/WebM files. Mkv/WebM files start with an EBML header, followed by one or more segments containing the actual media data and metadata.
 Roughly, the structure looks like:
 
 ``` text
@@ -54,10 +45,23 @@ Roughly, the structure looks like:
 └──────────────────────────────────────────────────┘
 ```
 
+MKV files are made of elements, each with an ID, size, and body. Elements can be of two types:
+- Master elements: containers for other elements (like folders)
+- Leaf elements: contain a single value of a specific type:
+    - Unsigned integers
+    - Signed integers
+    - Floating point numbers
+    - Strings (UTF-8/ASCII)
+    - Binary data
+    - Dates (timestamps in nanoseconds offset to 2001-01-01T00:00:00.000000000 UTC)
+
+See the [Matroska specifications] for more details.
+
+
 ### Blocking I/O
 
-1. Reading elements from types implementing `std::io::Read` .
-2. Writing elements to types implementing `std::io::Write`.
+1. Reading elements from types implementing [`std::io::Read`] .
+2. Writing elements to types implementing [`std::io::Write`].
 
 ```rust
 use mkv_element::prelude::*; // prelude brings all the types into scope
@@ -115,7 +119,7 @@ assert_eq!(ebml, ebml_read_4);
 
 ### Asynchronous I/O
 
-With features `tokio` enabled, async I/O from tokio is supported.
+With features `tokio` enabled, async I/O from tokio is supported. Use the `async_read_from()`, `async_read_element()`, and `async_write_to()` methods respectively.
 
 ```rust
 # tokio_test::block_on(async {
@@ -136,7 +140,7 @@ let ebml = Ebml {
     void: None,
 };
 
-// Write the EBML element to a type implementing std::io::Write
+// Write the EBML element to a type implementing tokio::io::Write
 
 // 1. to a Vec<u8>
 let mut buffer = Vec::new();
@@ -172,16 +176,15 @@ assert_eq!(ebml, ebml_read_4);
 # })
 ```
 
-
-## Note
+## Quick Note
 1. if you need to work with actual MKV files, don't read a whole segment into memory at once, read only the parts you need instead. Real world MKV files can be very large.
-2. According to the Matroska specifications, segments and clusters can have an "unknown" size (all size bytes set to 1). In that case, the segment/cluster extends to the end of the file or until the next segment/cluster. This needs to handle by the user. Trying to read such elements with this library will result in an `ElementBodySizeUnknown` error.
+2. According to the Matroska specifications, segments and clusters can have an "unknown" size (all size bytes set to 1). In that case, the segment/cluster extends to the end of the file or until the next segment/cluster. This needs to handle by the user. Trying to read such elements with this library will result in an [`ElementBodySizeUnknown`](crate::Error::ElementBodySizeUnknown) error.
 3. This library does not attempt to recover from malformed/corrupted data. If such behavior is desired, extra logic can be added on top of this library.
 4. Output of this library MAY NOT be the same as input, but should be semantically equivalent and valid. For example, output order of elements may differ from input order, as the order is not strictly enforced by the Matroska specifications.
 
 
 ## Acknowledgements
-Some of the ideas and code snippets were inspired by ~or stolen from~ the following sources, thanks to their authors:
+Some of the ideas and code snippets were inspired by the following sources, thanks to their authors:
 - [mp4-atom](https://github.com/kixelated/mp4-atom) by *kixelated*
 - [Network protocols, sans I/O](https://sans-io.readthedocs.io/)
 
@@ -193,6 +196,14 @@ See the <a href="LICENSE">LICENSE</a> file for details.
 
 
 
-
-
-
+[Matroska specifications]: https://www.matroska.org/technical/specs/index.html
+[`read_from()`]: crate::io::blocking_impl::ReadFrom::read_from
+[`write_to()`]: crate::io::blocking_impl::WriteTo::write_to
+[`async_read_from()`]: crate::io::tokio_impl::AsyncReadFrom::async_read_from
+[`async_read_element()`]: crate::io::tokio_impl::AsyncReadElement::async_read_element
+[`async_write_to()`]: crate::io::tokio_impl::AsyncWriteTo::async_write_to
+[Extensible Binary Meta Language]: https://en.wikipedia.org/wiki/Extensible_Binary_Meta_Language
+[`std::io::Read`]: std::io::Read
+[`std::io::Write`]: std::io::Write
+[`tokio::io::AsyncRead`]: tokio::io::AsyncRead
+[`tokio::io::AsyncWrite`]: tokio::io::AsyncWrite
