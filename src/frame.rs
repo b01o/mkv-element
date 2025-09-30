@@ -70,7 +70,7 @@ enum BlockRef<'a> {
 impl<'a> BlockRef<'a> {
     fn into_frames(self, cluster_ts: u64) -> impl Iterator<Item = crate::Result<Frame<'a>>> + 'a {
         // Without automatic sum types or generators, it's kind of amusing to write an iterator
-        // FIXME when standard library are ready
+        // FIXME: Replace this workaround with a generator or sum type iterator when Rust stabilizes generators (see https://github.com/rust-lang/rust/issues/43122)
         enum Output<T1, T2, T3, T4, T5, T6, T7> {
             Once(T1),
             Xiph(T2),

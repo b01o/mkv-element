@@ -61,10 +61,12 @@ impl Lacer {
             }
             Lacer::FixedSize => {
                 let frame_size = frames[0].len();
-                assert!(
-                    frames.iter().all(|f| f.len() == frame_size),
-                    "All frames must have the same size for FixedSize lacing"
-                );
+                if let Some((idx, bad_frame)) = frames.iter().enumerate().find(|(_, f)| f.len() != frame_size) {
+                    panic!(
+                        "All frames must have the same size for FixedSize lacing: expected size {}, but frame at index {} has size {}",
+                        frame_size, idx, bad_frame.len()
+                    );
+                }
                 for frame in frames {
                     output.extend_from_slice(frame);
                 }
@@ -100,7 +102,7 @@ impl Lacer {
                     } else if diff > -(2i64.pow(48) - 1) && diff < (2i64.pow(48)) {
                         7
                     } else {
-                        panic!("Frame size diff too large for EBML lacing");
+                        panic!("Frame size diff too large for EBML lacing: diff = {}", diff);
                     };
 
                     // map to unsigned
