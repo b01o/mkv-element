@@ -61,10 +61,16 @@ impl Lacer {
             }
             Lacer::FixedSize => {
                 let frame_size = frames[0].len();
-                if let Some((idx, bad_frame)) = frames.iter().enumerate().find(|(_, f)| f.len() != frame_size) {
+                if let Some((idx, bad_frame)) = frames
+                    .iter()
+                    .enumerate()
+                    .find(|(_, f)| f.len() != frame_size)
+                {
                     panic!(
                         "All frames must have the same size for FixedSize lacing: expected size {}, but frame at index {} has size {}",
-                        frame_size, idx, bad_frame.len()
+                        frame_size,
+                        idx,
+                        bad_frame.len()
                     );
                 }
                 for frame in frames {
