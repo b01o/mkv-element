@@ -2,6 +2,7 @@ use crate::base::VInt64;
 
 /// Error types for this crate.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// I/O error, from `std::io::Error`.
     #[error("I/O error: {0}")]

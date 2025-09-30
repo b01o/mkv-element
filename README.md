@@ -3,7 +3,7 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 # mkv-element
-A Rust library for reading and writing Matroska/WebM (MKV) elements.
+A Rust library for reading and writing Matroska(MKV)/WebM elements.
 
 This library provides a simple and efficient way to parse and serialize MKV elements both in memory and on disk, with support for both blocking and asynchronous I/O operations.
 
@@ -16,8 +16,8 @@ Asynchronous I/O is supported with the `tokio` feature enabled. The [`async_read
 All non-master elements in this crate implements the `Deref` trait, allowing easy access to the inner value. For example, if you have an `UnsignedInteger` element, you can access its value directly using the `*` operator or by calling `.deref()`.
 
 
-# Primer on MKV/WebM (EBML) Structure
-EBML([Extensible Binary Meta Language]) is a binary format similar to XML, but more efficient and flexible. It is used as the underlying format for Matroska/WebM files. Mkv/WebM files start with an EBML header, followed by one or more segments containing the actual media data and metadata.
+# Primer on Matroska/WebM (EBML) Structure
+EBML([Extensible Binary Meta Language]) is a binary format similar to XML, but more efficient and flexible. It is used as the underlying format for Matroska(MKV)/WebM files. Matroska(MKV)/WebM files start with an EBML header, followed by one or more segments containing the actual media data and metadata.
 Roughly, the structure looks like:
 
 ``` text

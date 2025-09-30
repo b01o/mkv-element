@@ -1,11 +1,14 @@
 [package]
 name    = "mkv-element"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 authors     = ["b01o <b01o@proton.me>"]
 repository  = "https://github.com/b01o/mkv-element"
 license     = "MIT"
 description = "A Matroska/WebM element reader and writer."
+
+keywords = ["matroska", "webm", "async", "parser", "writer"]
+categories = ["asynchronous", "encoding", "multimedia::encoding"]
 
 [dependencies]
 thiserror = "2"
