@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use crate::{
     base::VInt64,
     functional::{Decode, Encode},
@@ -20,6 +22,8 @@ pub struct Frame<'a> {
     pub track_number: u64,
     /// timestamp of the frame, in the same timescale as the Cluster timestamp
     pub timestamp: i64,
+    /// duration of the frame, in the same timescale as the Cluster timestamp
+    pub duration: Option<NonZero<u64>>,
 }
 
 /// A block in a Cluster, either a SimpleBlock or a BlockGroup.
@@ -137,6 +141,7 @@ impl<'a> BlockRef<'a> {
                         is_discardable: (flag & 0x01) != 0,
                         track_number: *track_number,
                         timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                        duration: None,
                     })))
                 } else if lacing == 0b01 {
                     let data = match Lacer::Xiph.delace(data) {
@@ -152,6 +157,7 @@ impl<'a> BlockRef<'a> {
                             is_discardable: (flag & 0x01) != 0,
                             track_number: *track_number,
                             timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                            duration: None,
                         })
                     }))
                 } else if lacing == 0b11 {
@@ -168,6 +174,7 @@ impl<'a> BlockRef<'a> {
                             is_discardable: (flag & 0x01) != 0,
                             track_number: *track_number,
                             timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                            duration: None,
                         })
                     }))
                 } else {
@@ -184,6 +191,7 @@ impl<'a> BlockRef<'a> {
                             is_discardable: (flag & 0x01) != 0,
                             track_number: *track_number,
                             timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                            duration: None,
                         })
                     }))
                 }
@@ -218,6 +226,7 @@ impl<'a> BlockRef<'a> {
                         is_discardable: false,
                         track_number: *track_number,
                         timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                        duration: g.block_duration.and_then(|d| NonZero::new(*d)),
                     })))
                 } else if lacing == 0b01 {
                     let data = match Lacer::Xiph.delace(data) {
@@ -233,6 +242,7 @@ impl<'a> BlockRef<'a> {
                             is_discardable: false,
                             track_number: *track_number,
                             timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                            duration: g.block_duration.and_then(|d| NonZero::new(*d)),
                         })
                     }))
                 } else if lacing == 0b11 {
@@ -248,6 +258,7 @@ impl<'a> BlockRef<'a> {
                             is_discardable: false,
                             track_number: *track_number,
                             timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                            duration: g.block_duration.and_then(|d| NonZero::new(*d)),
                         })
                     }))
                 } else {
@@ -263,6 +274,7 @@ impl<'a> BlockRef<'a> {
                             is_discardable: false,
                             track_number: *track_number,
                             timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                            duration: g.block_duration.and_then(|d| NonZero::new(*d)),
                         })
                     }))
                 }
