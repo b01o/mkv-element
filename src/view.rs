@@ -24,12 +24,8 @@ impl MatroskaView {
         // Read the EBML header
         let ebml = Ebml::read_from(reader)?;
 
-        let mut segments = Vec::new();
-
         // Parse all segments in the file
-        while let Ok(segment) = SegmentView::new(reader) {
-            segments.push(segment);
-        }
+        let segments = SegmentView::new(reader)?;
 
         // At least one segment is required
         if segments.is_empty() {
@@ -55,17 +51,8 @@ impl MatroskaView {
         // Read the EBML header
         let ebml = Ebml::async_read_from(reader).await?;
 
-        let mut segments = Vec::new();
-
         // Parse all segments in the file
-        while let Ok(segment) = SegmentView::new_async(reader).await {
-            segments.push(segment);
-        }
-
-        // At least one segment is required
-        if segments.is_empty() {
-            return Err(crate::Error::MissingElement(Segment::ID));
-        }
+        let segments = SegmentView::new_async(reader).await?;
 
         Ok(MatroskaView {
             ebml,
@@ -100,11 +87,14 @@ pub struct SegmentView {
 impl SegmentView {
     /// Create a new SegmentView by parsing the Segment header and metadata elements,
     /// but skipping Cluster data to avoid loading it into memory.
-    pub fn new<R>(reader: &mut R) -> crate::Result<Self>
+    pub fn new<R>(reader: &mut R) -> crate::Result<Vec<Self>>
     where
         R: std::io::Read + std::io::Seek,
     {
+        let mut out = vec![];
+
         use crate::io::blocking_impl::*;
+        use std::io::SeekFrom;
 
         // Read the Segment header
         let segment_header = crate::base::Header::read_from(reader)?;
@@ -112,7 +102,7 @@ impl SegmentView {
             return Err(crate::Error::MissingElement(Segment::ID));
         }
 
-        let segment_data_position = reader.stream_position()?;
+        let mut segment_data_position = reader.stream_position()?;
 
         let mut seek_head = Vec::new();
         let mut info = None;
@@ -125,64 +115,101 @@ impl SegmentView {
 
         // Parse segment elements
         loop {
+            use crate::base::Header;
+
             let current_position = reader.stream_position()?;
+            let Ok(header) = Header::read_from(reader) else {
+                break;
+            };
+            if header.id == Cluster::ID && first_cluster_position.is_none() {
+                first_cluster_position = Some(current_position);
+            }
 
             // Check if we've reached the end of the segment
-            if let Ok(header) = crate::base::Header::read_from(reader) {
-                match header.id {
-                    SeekHead::ID => {
-                        let element = SeekHead::read_element(&header, reader)?;
-                        seek_head.push(element);
-                    }
-                    Info::ID => {
-                        let element = Info::read_element(&header, reader)?;
-                        info = Some(element);
-                    }
-                    Tracks::ID => {
-                        let element = Tracks::read_element(&header, reader)?;
-                        tracks = Some(element);
-                    }
-                    Cues::ID => {
-                        let element = Cues::read_element(&header, reader)?;
-                        cues = Some(element);
-                    }
-                    Attachments::ID => {
-                        let element = Attachments::read_element(&header, reader)?;
-                        attachments = Some(element);
-                    }
-                    Chapters::ID => {
-                        let element = Chapters::read_element(&header, reader)?;
-                        chapters = Some(element);
-                    }
-                    Tags::ID => {
-                        let element = Tags::read_element(&header, reader)?;
-                        tags.push(element);
-                    }
-                    Cluster::ID => {
-                        // Found the first cluster, record its position and stop parsing
-                        if first_cluster_position.is_none() {
-                            first_cluster_position = Some(current_position);
-                        }
+            match header.id {
+                SeekHead::ID => seek_head.push(SeekHead::read_element(&header, reader)?),
+                Info::ID => info = Some(Info::read_element(&header, reader)?),
+                Tracks::ID => tracks = Some(Tracks::read_element(&header, reader)?),
+                Cues::ID => cues = Some(Cues::read_element(&header, reader)?),
+                Attachments::ID => attachments = Some(Attachments::read_element(&header, reader)?),
+                Chapters::ID => chapters = Some(Chapters::read_element(&header, reader)?),
+                Tags::ID => tags.push(Tags::read_element(&header, reader)?),
+                Cluster::ID => {
+                    // try to skip, or else break
+
+                    use crate::base::VInt64;
+                    if seek_head.is_empty() {
                         break;
                     }
-                    _ => {
-                        use log::warn;
-                        use std::io::Read;
-                        // Skip unknown elements, here we read and discard the data for efficiency
-                        std::io::copy(&mut reader.take(*header.size), &mut std::io::sink())?;
-                        warn!("Skipped unknown element with ID: {}", header.id);
+
+                    let mut seeks: Vec<(VInt64, u64)> = seek_head
+                        .iter()
+                        .flat_map(|sh| {
+                            sh.seek.iter().flat_map(|s| {
+                                let mut id = &s.seek_id[..];
+                                let a = VInt64::read_from(&mut id);
+                                match a {
+                                    Ok(v) => Some((v, *s.seek_position + segment_data_position)),
+                                    Err(e) => {
+                                        log::warn!("Failed to read seek_id as VInt: {e}, skip...");
+                                        None
+                                    }
+                                }
+                            })
+                        })
+                        .collect();
+                    seeks.sort_by(|a, b| a.1.cmp(&b.1));
+                    // find position larger than first_cluster_position
+                    if let Some(pos) = seeks
+                        .iter()
+                        .find(|(_, pos)| *pos > first_cluster_position.unwrap())
+                    {
+                        reader.seek(SeekFrom::Start(pos.1))?;
+                        continue;
+                    } else {
+                        break;
                     }
                 }
-            } else {
-                // End of stream or error reading header
-                break;
+                Segment::ID => {
+                    out.push(SegmentView {
+                        seek_head,
+                        // Info is required in a valid Matroska file
+                        info: info.ok_or(crate::Error::MissingElement(Info::ID))?,
+                        tracks,
+                        cues,
+                        attachments,
+                        chapters,
+                        tags,
+                        first_cluster_position: first_cluster_position
+                            .ok_or(crate::Error::MissingElement(Cluster::ID))?,
+                        segment_data_position,
+                    });
+
+                    segment_data_position = reader.stream_position()?;
+
+                    seek_head = Vec::new();
+                    info = None;
+                    tracks = None;
+                    cues = None;
+                    attachments = None;
+                    chapters = None;
+                    tags = Vec::new();
+                    first_cluster_position = None;
+                }
+                _ => {
+                    use log::warn;
+                    use std::io::Read;
+                    // Skip unknown elements, here we read and discard the data for efficiency
+                    std::io::copy(&mut reader.take(*header.size), &mut std::io::sink())?;
+                    warn!("Skipped unknown element with ID: {}", header.id);
+                }
             }
         }
 
         // Info is required in a valid Matroska file
         let info = info.ok_or(crate::Error::MissingElement(Info::ID))?;
 
-        Ok(SegmentView {
+        out.push(SegmentView {
             seek_head,
             info,
             tracks,
@@ -190,19 +217,23 @@ impl SegmentView {
             attachments,
             chapters,
             tags,
-            first_cluster_position: first_cluster_position.unwrap_or(0),
+            first_cluster_position: first_cluster_position
+                .ok_or(crate::Error::MissingElement(Cluster::ID))?,
             segment_data_position,
-        })
+        });
+        Ok(out)
     }
 
     /// Create a new SegmentView by parsing the Segment header and metadata elements,
     /// but skipping Cluster data to avoid loading it into memory.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub async fn new_async<R>(reader: &mut R) -> crate::Result<Self>
+    pub async fn new_async<R>(reader: &mut R) -> crate::Result<Vec<Self>>
     where
         R: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
     {
+        let mut out = vec![];
+
         use crate::io::tokio_impl::*;
         use tokio::io::AsyncSeekExt;
 
@@ -212,7 +243,7 @@ impl SegmentView {
             return Err(crate::Error::MissingElement(Segment::ID));
         }
 
-        let segment_data_position = reader.stream_position().await?;
+        let mut segment_data_position = reader.stream_position().await?;
 
         let mut seek_head = Vec::new();
         let mut info = None;
@@ -225,65 +256,109 @@ impl SegmentView {
 
         // Parse segment elements
         loop {
+            use crate::base::Header;
+
             let current_position = reader.stream_position().await?;
+            let Ok(header) = Header::async_read_from(reader).await else {
+                break;
+            };
+            if header.id == Cluster::ID && first_cluster_position.is_none() {
+                first_cluster_position = Some(current_position);
+            }
 
             // Check if we've reached the end of the segment
-            if let Ok(header) = crate::base::Header::async_read_from(reader).await {
-                match header.id {
-                    SeekHead::ID => {
-                        let element = SeekHead::async_read_element(&header, reader).await?;
-                        seek_head.push(element);
-                    }
-                    Info::ID => {
-                        let element = Info::async_read_element(&header, reader).await?;
-                        info = Some(element);
-                    }
-                    Tracks::ID => {
-                        let element = Tracks::async_read_element(&header, reader).await?;
-                        tracks = Some(element);
-                    }
-                    Cues::ID => {
-                        let element = Cues::async_read_element(&header, reader).await?;
-                        cues = Some(element);
-                    }
-                    Attachments::ID => {
-                        let element = Attachments::async_read_element(&header, reader).await?;
-                        attachments = Some(element);
-                    }
-                    Chapters::ID => {
-                        let element = Chapters::async_read_element(&header, reader).await?;
-                        chapters = Some(element);
-                    }
-                    Tags::ID => {
-                        let element = Tags::async_read_element(&header, reader).await?;
-                        tags.push(element);
-                    }
-                    Cluster::ID => {
-                        // Found the first cluster, record its position and stop parsing
-                        if first_cluster_position.is_none() {
-                            first_cluster_position = Some(current_position);
-                        }
+            match header.id {
+                SeekHead::ID => {
+                    seek_head.push(SeekHead::async_read_element(&header, reader).await?)
+                }
+                Info::ID => info = Some(Info::async_read_element(&header, reader).await?),
+                Tracks::ID => tracks = Some(Tracks::async_read_element(&header, reader).await?),
+                Cues::ID => cues = Some(Cues::async_read_element(&header, reader).await?),
+                Attachments::ID => {
+                    attachments = Some(Attachments::async_read_element(&header, reader).await?)
+                }
+                Chapters::ID => {
+                    chapters = Some(Chapters::async_read_element(&header, reader).await?)
+                }
+                Tags::ID => tags.push(Tags::async_read_element(&header, reader).await?),
+                Cluster::ID => {
+                    // try to skip, or else break
+
+                    use crate::base::VInt64;
+                    if seek_head.is_empty() {
                         break;
                     }
-                    _ => {
-                        use log::warn;
-                        use tokio::io::AsyncReadExt;
-                        // Skip unknown elements, here we read and discard the data for efficiency
-                        tokio::io::copy(&mut reader.take(*header.size), &mut tokio::io::sink())
-                            .await?;
-                        warn!("Skipped unknown element with ID: {}", header.id);
+
+                    let mut seeks: Vec<(VInt64, u64)> = seek_head
+                        .iter()
+                        .flat_map(|sh| {
+                            sh.seek.iter().flat_map(|s| {
+                                use crate::io::blocking_impl::ReadFrom;
+
+                                let mut id = &s.seek_id[..];
+                                let a = VInt64::read_from(&mut id);
+                                match a {
+                                    Ok(v) => Some((v, *s.seek_position + segment_data_position)),
+                                    Err(e) => {
+                                        log::warn!("Failed to read seek_id as VInt: {e}, skip...");
+                                        None
+                                    }
+                                }
+                            })
+                        })
+                        .collect();
+                    seeks.sort_by(|a, b| a.1.cmp(&b.1));
+                    // find position larger than first_cluster_position
+                    if let Some(pos) = seeks
+                        .iter()
+                        .find(|(_, pos)| *pos > first_cluster_position.unwrap())
+                    {
+                        reader.seek(std::io::SeekFrom::Start(pos.1)).await?;
+                        continue;
+                    } else {
+                        break;
                     }
                 }
-            } else {
-                // End of stream or error reading header
-                break;
+                Segment::ID => {
+                    out.push(SegmentView {
+                        seek_head,
+                        // Info is required in a valid Matroska file
+                        info: info.ok_or(crate::Error::MissingElement(Info::ID))?,
+                        tracks,
+                        cues,
+                        attachments,
+                        chapters,
+                        tags,
+                        first_cluster_position: first_cluster_position
+                            .ok_or(crate::Error::MissingElement(Cluster::ID))?,
+                        segment_data_position,
+                    });
+
+                    segment_data_position = reader.stream_position().await?;
+
+                    seek_head = Vec::new();
+                    info = None;
+                    tracks = None;
+                    cues = None;
+                    attachments = None;
+                    chapters = None;
+                    tags = Vec::new();
+                    first_cluster_position = None;
+                }
+                _ => {
+                    use log::warn;
+                    use tokio::io::AsyncReadExt;
+                    // Skip unknown elements, here we read and discard the data for efficiency
+                    tokio::io::copy(&mut reader.take(*header.size), &mut tokio::io::sink()).await?;
+                    warn!("Skipped unknown element with ID: {}", header.id);
+                }
             }
         }
 
         // Info is required in a valid Matroska file
         let info = info.ok_or(crate::Error::MissingElement(Info::ID))?;
 
-        Ok(SegmentView {
+        out.push(SegmentView {
             seek_head,
             info,
             tracks,
@@ -291,8 +366,10 @@ impl SegmentView {
             attachments,
             chapters,
             tags,
-            first_cluster_position: first_cluster_position.unwrap_or(0),
+            first_cluster_position: first_cluster_position
+                .ok_or(crate::Error::MissingElement(Cluster::ID))?,
             segment_data_position,
-        })
+        });
+        Ok(out)
     }
 }
