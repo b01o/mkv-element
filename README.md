@@ -140,7 +140,7 @@ To enable these features, add them to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mkv-element = { version = "0.2", features = ["tokio", "utils"] }
+mkv-element = { version = "0.3", features = ["tokio", "utils"] }
 ```
 
 ## Notes
