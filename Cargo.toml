@@ -1,6 +1,6 @@
 [package]
 name    = "mkv-element"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 authors     = ["b01o <b01o@proton.me>"]
 repository  = "https://github.com/b01o/mkv-element"
