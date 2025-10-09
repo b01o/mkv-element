@@ -1,3 +1,5 @@
+#![cfg(feature = "utils")]
+
 use mkv_element::io::blocking_impl::{WriteElement, WriteTo};
 use mkv_element::prelude::*;
 use mkv_element::view::MatroskaView;

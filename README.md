@@ -176,6 +176,25 @@ assert_eq!(ebml, ebml_read_4);
 # })
 ```
 
+## Features
+
+This crate provides the following optional features:
+
+- **`tokio`**: Enables asynchronous I/O support using Tokio. This adds `async_read_from()`, `async_read_element()`, and `async_write_to()` methods that work with types implementing `tokio::io::AsyncRead` and `tokio::io::AsyncWrite`.
+
+- **`utils`**: Enables utility modules for working with Matroska files, such as the `view` module. The `view` module provides `MatroskaView` and `SegmentView` structs for efficiently parsing MKV file metadata without loading cluster data into memory.
+
+To enable these features, add them to your `Cargo.toml`:
+
+```toml
+[dependencies]
+mkv-element = { version = "0.2", features = ["tokio", "utils"] }
+```
+
+## Important notes
+1. if you need to work with actual MKV files, don't read a whole segment into memory at once, read only the parts you need instead. Real world MKV files can be very large.)
+```
+
 ## Quick Note
 1. if you need to work with actual MKV files, don't read a whole segment into memory at once, read only the parts you need instead. Real world MKV files can be very large.
 2. According to the Matroska specifications, segments and clusters can have an "unknown" size (all size bytes set to 1). In that case, the segment/cluster extends to the end of the file or until the next segment/cluster. This needs to handle by the user. Trying to read such elements with this library will result in an [`ElementBodySizeUnknown`](crate::Error::ElementBodySizeUnknown) error.
