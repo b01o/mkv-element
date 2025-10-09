@@ -1,5 +1,7 @@
 //! A View of a Matroska file, parsing w/o loading clusters into memory.
 
+use std::mem::take;
+
 use crate::element::Element;
 use crate::master::*;
 
@@ -9,7 +11,7 @@ pub struct MatroskaView {
     /// The EBML header.
     pub ebml: Ebml,
     /// The Segment views, as there can be multiple segments in a Matroska file.
-    pub segment: Vec<SegmentView>,
+    pub segments: Vec<SegmentView>,
 }
 
 impl MatroskaView {
@@ -32,10 +34,7 @@ impl MatroskaView {
             return Err(crate::Error::MissingElement(Segment::ID));
         }
 
-        Ok(MatroskaView {
-            ebml,
-            segment: segments,
-        })
+        Ok(MatroskaView { ebml, segments })
     }
 
     /// Create a new MatroskaView by parsing the EBML header and all Segment headers,
@@ -54,10 +53,7 @@ impl MatroskaView {
         // Parse all segments in the file
         let segments = SegmentView::new_async(reader).await?;
 
-        Ok(MatroskaView {
-            ebml,
-            segment: segments,
-        })
+        Ok(MatroskaView { ebml, segments })
     }
 }
 
@@ -78,10 +74,10 @@ pub struct SegmentView {
     pub chapters: Option<Chapters>,
     /// Element containing metadata describing Tracks, Editions, Chapters, Attachments, or the Segment as a whole. A list of valid tags can be found in [Matroska tagging RFC](https://www.matroska.org/technical/tagging.html).
     pub tags: Vec<Tags>,
-    /// The position of the first Cluster in the Segment.
-    pub first_cluster_position: u64,
     /// The position of the Segment data (after the Segment header).
     pub segment_data_position: u64,
+    /// The position of the first Cluster in the Segment. 0 if no Cluster found.
+    pub first_cluster_position: u64,
 }
 
 impl SegmentView {
@@ -111,7 +107,7 @@ impl SegmentView {
         let mut attachments = None;
         let mut chapters = None;
         let mut tags = Vec::new();
-        let mut first_cluster_position = None;
+        let mut first_cluster_position = 0;
 
         // Parse segment elements
         loop {
@@ -121,8 +117,8 @@ impl SegmentView {
             let Ok(header) = Header::read_from(reader) else {
                 break;
             };
-            if header.id == Cluster::ID && first_cluster_position.is_none() {
-                first_cluster_position = Some(current_position);
+            if header.id == Cluster::ID && first_cluster_position == 0 {
+                first_cluster_position = current_position;
             }
 
             // Check if we've reached the end of the segment
@@ -136,12 +132,7 @@ impl SegmentView {
                 Tags::ID => tags.push(Tags::read_element(&header, reader)?),
                 Cluster::ID => {
                     // try to skip, or else break
-
                     use crate::base::VInt64;
-                    if seek_head.is_empty() {
-                        break;
-                    }
-
                     let mut seeks: Vec<(VInt64, u64)> = seek_head
                         .iter()
                         .flat_map(|sh| {
@@ -158,43 +149,37 @@ impl SegmentView {
                             })
                         })
                         .collect();
+
                     seeks.sort_by(|a, b| a.1.cmp(&b.1));
+
                     // find position larger than first_cluster_position
-                    if let Some(pos) = seeks
-                        .iter()
-                        .find(|(_, pos)| *pos > first_cluster_position.unwrap())
-                    {
+                    if let Some(pos) = seeks.iter().find(|(_, pos)| *pos > first_cluster_position) {
                         reader.seek(SeekFrom::Start(pos.1))?;
                         continue;
-                    } else {
+                    }
+
+                    if segment_header.size.is_unknown {
                         break;
+                    } else {
+                        let eos = segment_data_position + *segment_header.size;
+                        reader.seek(SeekFrom::Start(eos))?;
+                        continue;
                     }
                 }
                 Segment::ID => {
                     out.push(SegmentView {
-                        seek_head,
+                        seek_head: take(&mut seek_head),
                         // Info is required in a valid Matroska file
-                        info: info.ok_or(crate::Error::MissingElement(Info::ID))?,
-                        tracks,
-                        cues,
-                        attachments,
-                        chapters,
-                        tags,
-                        first_cluster_position: first_cluster_position
-                            .ok_or(crate::Error::MissingElement(Cluster::ID))?,
-                        segment_data_position,
+                        info: info.take().ok_or(crate::Error::MissingElement(Info::ID))?,
+                        tracks: tracks.take(),
+                        cues: cues.take(),
+                        attachments: attachments.take(),
+                        chapters: chapters.take(),
+                        tags: take(&mut tags),
+                        first_cluster_position: take(&mut first_cluster_position),
+                        segment_data_position: take(&mut segment_data_position),
                     });
-
                     segment_data_position = reader.stream_position()?;
-
-                    seek_head = Vec::new();
-                    info = None;
-                    tracks = None;
-                    cues = None;
-                    attachments = None;
-                    chapters = None;
-                    tags = Vec::new();
-                    first_cluster_position = None;
                 }
                 _ => {
                     use log::warn;
@@ -217,8 +202,7 @@ impl SegmentView {
             attachments,
             chapters,
             tags,
-            first_cluster_position: first_cluster_position
-                .ok_or(crate::Error::MissingElement(Cluster::ID))?,
+            first_cluster_position,
             segment_data_position,
         });
         Ok(out)
@@ -252,7 +236,7 @@ impl SegmentView {
         let mut attachments = None;
         let mut chapters = None;
         let mut tags = Vec::new();
-        let mut first_cluster_position = None;
+        let mut first_cluster_position = 0;
 
         // Parse segment elements
         loop {
@@ -262,8 +246,8 @@ impl SegmentView {
             let Ok(header) = Header::async_read_from(reader).await else {
                 break;
             };
-            if header.id == Cluster::ID && first_cluster_position.is_none() {
-                first_cluster_position = Some(current_position);
+            if header.id == Cluster::ID && first_cluster_position == 0 {
+                first_cluster_position = current_position;
             }
 
             // Check if we've reached the end of the segment
@@ -309,10 +293,7 @@ impl SegmentView {
                         .collect();
                     seeks.sort_by(|a, b| a.1.cmp(&b.1));
                     // find position larger than first_cluster_position
-                    if let Some(pos) = seeks
-                        .iter()
-                        .find(|(_, pos)| *pos > first_cluster_position.unwrap())
-                    {
+                    if let Some(pos) = seeks.iter().find(|(_, pos)| *pos > first_cluster_position) {
                         reader.seek(std::io::SeekFrom::Start(pos.1)).await?;
                         continue;
                     } else {
@@ -329,8 +310,7 @@ impl SegmentView {
                         attachments,
                         chapters,
                         tags,
-                        first_cluster_position: first_cluster_position
-                            .ok_or(crate::Error::MissingElement(Cluster::ID))?,
+                        first_cluster_position,
                         segment_data_position,
                     });
 
@@ -343,7 +323,7 @@ impl SegmentView {
                     attachments = None;
                     chapters = None;
                     tags = Vec::new();
-                    first_cluster_position = None;
+                    first_cluster_position = 0;
                 }
                 _ => {
                     use log::warn;
@@ -366,8 +346,7 @@ impl SegmentView {
             attachments,
             chapters,
             tags,
-            first_cluster_position: first_cluster_position
-                .ok_or(crate::Error::MissingElement(Cluster::ID))?,
+            first_cluster_position,
             segment_data_position,
         });
         Ok(out)
