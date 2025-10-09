@@ -15,6 +15,10 @@ mod supplement; // Supplementary elements in Matroska. Void elements, CRC-32, et
 // following modules are public
 pub mod io;
 
+#[cfg(feature = "utils")]
+#[cfg_attr(docsrs, doc(cfg(feature = "utils")))]
+pub mod view;
+
 // Re-export common types
 pub use crate::frame::*;
 pub use crate::lacer::*;

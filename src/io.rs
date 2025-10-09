@@ -61,6 +61,19 @@ pub mod blocking_impl {
             Ok(())
         }
     }
+
+    /// Write an element to a writer provided the header.
+    pub trait WriteElement: Sized + Element {
+        /// Write an element to a writer.
+        fn write_element<W: Write>(&self, header: &Header, w: &mut W) -> crate::Result<()> {
+            header.write_to(w)?;
+            let mut buf = vec![];
+            self.encode_body(&mut buf)?;
+            w.write_all(&buf)?;
+            Ok(())
+        }
+    }
+    impl<T: Element> WriteElement for T {}
 }
 /// tokio non-blocking I/O implementations, supporting async reading and writing.
 #[cfg(feature = "tokio")]
@@ -118,6 +131,24 @@ pub mod tokio_impl {
             Ok(w.write_all(&buf).await?)
         }
     }
+
+    /// Write an element to a writer provided the header asynchronously.
+    pub trait AsyncWriteElement: Sized + Element {
+        /// Write an element to a writer asynchronously.
+        fn async_write_element<W: tokio::io::AsyncWrite + Unpin>(
+            &self,
+            header: &Header,
+            w: &mut W,
+        ) -> impl std::future::Future<Output = crate::Result<()>> {
+            async {
+                header.async_write_to(w).await?;
+                let mut buf = vec![];
+                self.encode_body(&mut buf)?;
+                Ok(w.write_all(&buf).await?)
+            }
+        }
+    }
+    impl<T: Element> AsyncWriteElement for T {}
 
     impl Header {
         /// Read the body of the element from a reader into memory.
