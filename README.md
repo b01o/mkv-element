@@ -128,6 +128,72 @@ assert_eq!(ebml, parsed);
 # });
 ```
 
+### Efficient Metadata Parsing with View
+
+The `view` module (requires `utils` feature) provides memory-efficient parsing of MKV files by loading only metadata while skipping cluster data:
+
+```rust
+use mkv_element::prelude::*;
+use mkv_element::io::blocking_impl::*;
+use mkv_element::view::MatroskaView;
+
+// Create a sample MKV file in memory
+let ebml = Ebml {
+    ebml_max_id_length: EbmlMaxIdLength(4),
+    ebml_max_size_length: EbmlMaxSizeLength(8),
+    doc_type: Some(DocType("matroska".to_string())),
+    doc_type_version: Some(DocTypeVersion(4)),
+    doc_type_read_version: Some(DocTypeReadVersion(2)),
+    ..Default::default()
+};
+
+let segment = Segment {
+    crc32: None,
+    void: None,
+    seek_head: vec![],
+    info: Info {
+        timestamp_scale: TimestampScale(1000000),
+        muxing_app: MuxingApp("mkv-element".to_string()),
+        writing_app: WritingApp("example".to_string()),
+        duration: Some(Duration(120000.0)),
+        title: Some(Title("Sample Video".to_string())),
+        ..Default::default()
+    },
+    cluster: vec![Cluster {
+        timestamp: Timestamp(0),
+        ..Default::default()
+    }],
+    tracks: Some(Tracks {
+        track_entry: vec![TrackEntry {
+            track_number: TrackNumber(1),
+            track_uid: TrackUid(1234567890),
+            track_type: TrackType(1), // Video
+            codec_id: CodecId("V_VP9".to_string()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    }),
+    cues: None,
+    attachments: None,
+    chapters: None,
+    tags: vec![],
+};
+
+let mut buffer = Vec::new();
+ebml.write_to(&mut buffer).unwrap();
+segment.write_to(&mut buffer).unwrap();
+
+// Parse with MatroskaView - skips cluster data for efficiency
+let mut cursor = std::io::Cursor::new(&buffer);
+let view = MatroskaView::new(&mut cursor).unwrap();
+
+// Access metadata without loading cluster data
+assert_eq!(view.ebml.doc_type.as_ref().unwrap().0, "matroska");
+assert_eq!(view.segments.len(), 1);
+assert_eq!(view.segments[0].info.title.as_ref().unwrap().0, "Sample Video");
+assert_eq!(view.segments[0].tracks.as_ref().unwrap().track_entry.len(), 1);
+```
+
 ## Features
 
 This crate provides the following optional features:
