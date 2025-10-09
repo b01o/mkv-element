@@ -60,120 +60,72 @@ See the [Matroska specifications] for more details.
 
 ### Blocking I/O
 
-1. Reading elements from types implementing [`std::io::Read`] .
-2. Writing elements to types implementing [`std::io::Write`].
-
 ```rust
-use mkv_element::prelude::*; // prelude brings all the types into scope
-use mkv_element::io::blocking_impl::*; // use blocking_impl for blocking I/O
+use mkv_element::prelude::*;
+use mkv_element::io::blocking_impl::*;
 
-/// Create a simple EBML header element
+// Create an EBML header element
 let ebml = Ebml {
-    crc32: None,
-    ebml_version: None,
-    ebml_read_version: None,
     ebml_max_id_length: EbmlMaxIdLength(4),
     ebml_max_size_length: EbmlMaxSizeLength(8),
     doc_type: Some(DocType("matroska".to_string())),
-    doc_type_version: Some(DocTypeVersion(1)),
-    doc_type_read_version: Some(DocTypeReadVersion(1)),
-    void: None,
+    doc_type_version: Some(DocTypeVersion(4)),
+    doc_type_read_version: Some(DocTypeReadVersion(2)),
+    ..Default::default()
 };
 
-// Write the EBML element to a type implementing std::io::Write
-
-// 1. to a Vec<u8>
+// Write to a buffer
 let mut buffer = Vec::new();
 ebml.write_to(&mut buffer).unwrap();
 
-// 2. to a file
-let mut file = std::io::sink(); // replace with actual file, ie. std::fs::File::create("path/to/file.mkv").unwrap();
-ebml.write_to(&mut file).unwrap();
+// Read back using read_from()
+let parsed = Ebml::read_from(&mut &buffer[..]).unwrap();
+assert_eq!(ebml, parsed);
 
-
-// Reading a element can be done from either using the element's `read_from()` method
-// or reading out the header first followed by a `read_element()`.
-// the latter is useful when you don't know the element type in advance.
-
-// 1. using `read_from()`
-let mut buf_cursor = std::io::Cursor::new(&buffer);
-let ebml_read_1 = Ebml::read_from(&mut buf_cursor).unwrap();
-// or directly from a slice
-let ebml_read_2 = Ebml::read_from(&mut &buffer[..]).unwrap();
-// or from a file
-// let mut file = std::fs::File::open("path/to/file.mkv").unwrap();
-// let ebml_read_3 = Ebml::read_from(&mut file).unwrap();
-assert_eq!(ebml, ebml_read_1);
-assert_eq!(ebml, ebml_read_2);
-
-// 2. using `read_element()`
-let mut buf_cursor = std::io::Cursor::new(&buffer);
-let header = Header::read_from(&mut buf_cursor).unwrap();
+// Or read header first, then body
+let mut cursor = std::io::Cursor::new(&buffer);
+let header = Header::read_from(&mut cursor).unwrap();
 assert_eq!(header.id, Ebml::ID);
-let ebml_read_4 = Ebml::read_element(&header, &mut buf_cursor).unwrap();
-assert_eq!(ebml, ebml_read_4);
-
+let parsed = Ebml::read_element(&header, &mut cursor).unwrap();
+assert_eq!(ebml, parsed);
 ```
 
 
 
 ### Asynchronous I/O
 
-With features `tokio` enabled, async I/O from tokio is supported. Use the `async_read_from()`, `async_read_element()`, and `async_write_to()` methods respectively.
+With the `tokio` feature enabled:
 
 ```rust
 # tokio_test::block_on(async {
+use mkv_element::prelude::*;
+use mkv_element::io::tokio_impl::*;
 
-use mkv_element::prelude::*; // prelude brings all the types into scope
-use mkv_element::io::tokio_impl::*; // use tokio_impl for async I/O
-
-/// Create a simple EBML header element
+// Create an EBML header element
 let ebml = Ebml {
-    crc32: None,
-    ebml_version: None,
-    ebml_read_version: None,
     ebml_max_id_length: EbmlMaxIdLength(4),
     ebml_max_size_length: EbmlMaxSizeLength(8),
     doc_type: Some(DocType("matroska".to_string())),
-    doc_type_version: Some(DocTypeVersion(1)),
-    doc_type_read_version: Some(DocTypeReadVersion(1)),
-    void: None,
+    doc_type_version: Some(DocTypeVersion(4)),
+    doc_type_read_version: Some(DocTypeReadVersion(2)),
+    ..Default::default()
 };
 
-// Write the EBML element to a type implementing tokio::io::Write
-
-// 1. to a Vec<u8>
+// Write to a buffer
 let mut buffer = Vec::new();
 ebml.async_write_to(&mut buffer).await.unwrap();
 
-// 2. to a file
-let mut file = tokio::io::sink(); // replace with actual file, ie. tokio::fs::File::create("path/to/file.mkv").unwrap();
-ebml.async_write_to(&mut file).await.unwrap();
+// Read back using async_read_from()
+let parsed = Ebml::async_read_from(&mut &buffer[..]).await.unwrap();
+assert_eq!(ebml, parsed);
 
-
-// Reading a element can be done from either using the element's `read_from()` method
-// or reading out the header first followed by a `read_element()`.
-// the latter is useful when you don't know the element type in advance.
-
-// 1. using `read_from()`
-let mut buf_cursor = std::io::Cursor::new(&buffer);
-let ebml_read_1 = Ebml::async_read_from(&mut buf_cursor).await.unwrap();
-// or directly from a slice
-let ebml_read_2 = Ebml::async_read_from(&mut &buffer[..]).await.unwrap();
-// or from a file
-// let mut file = tokio::fs::File::open("path/to/file.mkv").unwrap();
-// let ebml_read_3 = Ebml::async_read_from(&mut file).await.unwrap();
-assert_eq!(ebml, ebml_read_1);
-assert_eq!(ebml, ebml_read_2);
-
-// 2. using `read_element()`
-let mut buf_cursor = std::io::Cursor::new(&buffer);
-let header = Header::async_read_from(&mut buf_cursor).await.unwrap();
+// Or read header first, then body
+let mut cursor = std::io::Cursor::new(&buffer);
+let header = Header::async_read_from(&mut cursor).await.unwrap();
 assert_eq!(header.id, Ebml::ID);
-let ebml_read_4 = Ebml::async_read_element(&header, &mut buf_cursor).await.unwrap();
-assert_eq!(ebml, ebml_read_4);
-
-# })
+let parsed = Ebml::async_read_element(&header, &mut cursor).await.unwrap();
+assert_eq!(ebml, parsed);
+# });
 ```
 
 ## Features
@@ -191,11 +143,7 @@ To enable these features, add them to your `Cargo.toml`:
 mkv-element = { version = "0.2", features = ["tokio", "utils"] }
 ```
 
-## Important notes
-1. if you need to work with actual MKV files, don't read a whole segment into memory at once, read only the parts you need instead. Real world MKV files can be very large.)
-```
-
-## Quick Note
+## Notes
 1. if you need to work with actual MKV files, don't read a whole segment into memory at once, read only the parts you need instead. Real world MKV files can be very large.
 2. According to the Matroska specifications, segments and clusters can have an "unknown" size (all size bytes set to 1). In that case, the segment/cluster extends to the end of the file or until the next segment/cluster. This needs to handle by the user. Trying to read such elements with this library will result in an [`ElementBodySizeUnknown`](crate::Error::ElementBodySizeUnknown) error.
 3. This library does not attempt to recover from malformed/corrupted data. If such behavior is desired, extra logic can be added on top of this library.
