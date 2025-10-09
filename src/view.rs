@@ -267,12 +267,7 @@ impl SegmentView {
                 Tags::ID => tags.push(Tags::async_read_element(&header, reader).await?),
                 Cluster::ID => {
                     // try to skip, or else break
-
                     use crate::base::VInt64;
-                    if seek_head.is_empty() {
-                        break;
-                    }
-
                     let mut seeks: Vec<(VInt64, u64)> = seek_head
                         .iter()
                         .flat_map(|sh| {
@@ -291,39 +286,37 @@ impl SegmentView {
                             })
                         })
                         .collect();
+
                     seeks.sort_by(|a, b| a.1.cmp(&b.1));
+
                     // find position larger than first_cluster_position
                     if let Some(pos) = seeks.iter().find(|(_, pos)| *pos > first_cluster_position) {
                         reader.seek(std::io::SeekFrom::Start(pos.1)).await?;
                         continue;
-                    } else {
+                    }
+
+                    if segment_header.size.is_unknown {
                         break;
+                    } else {
+                        let eos = segment_data_position + *segment_header.size;
+                        reader.seek(std::io::SeekFrom::Start(eos)).await?;
+                        continue;
                     }
                 }
                 Segment::ID => {
                     out.push(SegmentView {
-                        seek_head,
+                        seek_head: take(&mut seek_head),
                         // Info is required in a valid Matroska file
-                        info: info.ok_or(crate::Error::MissingElement(Info::ID))?,
-                        tracks,
-                        cues,
-                        attachments,
-                        chapters,
-                        tags,
-                        first_cluster_position,
-                        segment_data_position,
+                        info: info.take().ok_or(crate::Error::MissingElement(Info::ID))?,
+                        tracks: tracks.take(),
+                        cues: cues.take(),
+                        attachments: attachments.take(),
+                        chapters: chapters.take(),
+                        tags: take(&mut tags),
+                        first_cluster_position: take(&mut first_cluster_position),
+                        segment_data_position: take(&mut segment_data_position),
                     });
-
                     segment_data_position = reader.stream_position().await?;
-
-                    seek_head = Vec::new();
-                    info = None;
-                    tracks = None;
-                    cues = None;
-                    attachments = None;
-                    chapters = None;
-                    tags = Vec::new();
-                    first_cluster_position = 0;
                 }
                 _ => {
                     use log::warn;

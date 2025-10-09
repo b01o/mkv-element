@@ -219,3 +219,117 @@ fn test_unsize_segment() {
     assert_eq!(segment_view.tracks.as_ref().unwrap().track_entry.len(), 1);
     assert_ne!(segment_view.first_cluster_position, 0);
 }
+
+#[cfg(feature = "tokio")]
+mod async_tests {
+    use super::*;
+    use mkv_element::io::tokio_impl::{AsyncWriteElement, AsyncWriteTo};
+
+    #[tokio::test]
+    async fn test_basic_matroska_view_async() {
+        // Create a Matroska file with EBML header and a basic segment
+        let ebml_header = ebml();
+        let segment = segment1();
+
+        // Serialize to bytes
+        let mut buffer = Vec::new();
+        ebml_header.async_write_to(&mut buffer).await.unwrap();
+        segment.async_write_to(&mut buffer).await.unwrap();
+
+        let mut cursor = Cursor::new(&buffer);
+        let view = MatroskaView::new_async(&mut cursor).await.unwrap();
+        assert_eq!(view.ebml.doc_type.as_deref(), Some("matroska"));
+        assert_eq!(view.segments.len(), 1);
+        let segment_view = &view.segments[0];
+        assert_eq!(segment_view.info.title.as_deref(), Some("Test Segment 1"));
+        assert_eq!(segment_view.tracks.as_ref().unwrap().track_entry.len(), 1);
+        assert_ne!(segment_view.first_cluster_position, 0);
+    }
+
+    #[tokio::test]
+    async fn test_segment_without_clusters_async() {
+        // Create a Matroska file with EBML header and a segment without clusters
+        let ebml_header = ebml();
+        let segment = segment_without_clusters();
+
+        // Serialize to bytes
+        let mut buffer = Vec::new();
+        ebml_header.async_write_to(&mut buffer).await.unwrap();
+        segment.async_write_to(&mut buffer).await.unwrap();
+
+        let mut cursor = Cursor::new(&buffer);
+        let view = MatroskaView::new_async(&mut cursor).await.unwrap();
+        assert_eq!(view.ebml.doc_type.as_deref(), Some("matroska"));
+        assert_eq!(view.segments.len(), 1);
+        let segment_view = &view.segments[0];
+        assert_eq!(
+            segment_view.info.title.as_deref(),
+            Some("No Clusters Segment")
+        );
+        assert_eq!(segment_view.tracks.as_ref().unwrap().track_entry.len(), 1);
+        assert_eq!(segment_view.first_cluster_position, 0); // No clusters present
+    }
+
+    #[tokio::test]
+    async fn test_multiple_segments_async() {
+        // Create a Matroska file with EBML header and multiple segments
+        let ebml_header = ebml();
+        let segment1 = segment1();
+        let segment2 = segment1.clone();
+        let segment3 = segment1.clone();
+        let segment4 = segment_without_clusters();
+
+        // Serialize to bytes
+        let mut buffer = Vec::new();
+        ebml_header.async_write_to(&mut buffer).await.unwrap();
+        segment1.async_write_to(&mut buffer).await.unwrap();
+        segment2.async_write_to(&mut buffer).await.unwrap();
+        segment3.async_write_to(&mut buffer).await.unwrap();
+        segment4.async_write_to(&mut buffer).await.unwrap();
+
+        let mut cursor = Cursor::new(&buffer);
+        let view = MatroskaView::new_async(&mut cursor).await.unwrap();
+        assert_eq!(view.ebml.doc_type.as_deref(), Some("matroska"));
+        assert_eq!(view.segments.len(), 4, "should have 4 segments");
+
+        for (i, segment_view) in view.segments.iter().enumerate() {
+            if i < 3 {
+                assert_eq!(segment_view.info.title.as_deref(), Some("Test Segment 1"));
+                assert_eq!(segment_view.tracks.as_ref().unwrap().track_entry.len(), 1);
+                assert_ne!(segment_view.first_cluster_position, 0);
+            } else {
+                assert_eq!(
+                    segment_view.info.title.as_deref(),
+                    Some("No Clusters Segment")
+                );
+                assert_eq!(segment_view.tracks.as_ref().unwrap().track_entry.len(), 1);
+                assert_eq!(segment_view.first_cluster_position, 0); // No clusters present
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unsize_segment_async() {
+        let ebml_header = ebml();
+
+        let segment_header = Header {
+            id: Segment::ID,
+            size: VInt64::new_unknown(),
+        };
+        let segment = segment1();
+        let mut buffer = Vec::new();
+        ebml_header.async_write_to(&mut buffer).await.unwrap();
+        segment
+            .async_write_element(&segment_header, &mut buffer)
+            .await
+            .unwrap();
+        let mut cursor = Cursor::new(&buffer);
+        let view = MatroskaView::new_async(&mut cursor).await.unwrap();
+        assert_eq!(view.ebml.doc_type.as_deref(), Some("matroska"));
+        assert_eq!(view.segments.len(), 1);
+        let segment_view = &view.segments[0];
+        assert_eq!(segment_view.info.title.as_deref(), Some("Test Segment 1"));
+        assert_eq!(segment_view.tracks.as_ref().unwrap().track_entry.len(), 1);
+        assert_ne!(segment_view.first_cluster_position, 0);
+    }
+}
