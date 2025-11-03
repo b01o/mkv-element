@@ -8,10 +8,29 @@ use crate::{
     master::{BlockGroup, Cluster},
 };
 
-/// A Matroska encoded frame.
+/// Frame data, either a single frame or multiple frames (in case of lacing)
+/// See `Frame` for more details.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FrameData<'a> {
+    /// single frame data
+    Single(&'a [u8]),
+    /// multiple frame data (in case of lacing)
+    Multiple(Vec<&'a [u8]>),
+}
+
+impl<'a> FrameData<'a> {
+    fn single(data: &'a [u8]) -> Self {
+        FrameData::Single(data)
+    }
+    fn multiple(data: Vec<&'a [u8]>) -> Self {
+        FrameData::Multiple(data)
+    }
+}
+/// A Matroska Frame, representing a block(SimpleBlock/BlockGroup).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame<'a> {
-    /// in matroska timestamp units
-    pub data: &'a [u8],
+    /// frame data, either a single frame or multiple frames (in case of lacing)
+    pub data: FrameData<'a>,
     /// whether the frame is a keyframe
     pub is_keyframe: bool,
     /// whether the frame is invisible (mostly for subtitle tracks)
@@ -72,212 +91,54 @@ enum BlockRef<'a> {
 }
 
 impl<'a> BlockRef<'a> {
-    fn into_frames(self, cluster_ts: u64) -> impl Iterator<Item = crate::Result<Frame<'a>>> + 'a {
-        // Without automatic sum types or generators, it's kind of amusing to write an iterator
-        // FIXME: Replace this workaround with a generator or sum type iterator when Rust stabilizes generators (see https://github.com/rust-lang/rust/issues/43122)
-        enum Output<T1, T2, T3, T4, T5, T6, T7> {
-            Once(T1),
-            Xiph(T2),
-            Xiph2(T3),
-            Ebml(T4),
-            Ebml2(T5),
-            FixedSize(T6),
-            FixedSize2(T7),
-        }
-
-        impl<O, T1, T2, T3, T4, T5, T6, T7> Iterator for Output<T1, T2, T3, T4, T5, T6, T7>
-        where
-            T1: Iterator<Item = O>,
-            T2: Iterator<Item = O>,
-            T3: Iterator<Item = O>,
-            T4: Iterator<Item = O>,
-            T5: Iterator<Item = O>,
-            T6: Iterator<Item = O>,
-            T7: Iterator<Item = O>,
-        {
-            type Item = O;
-            fn next(&mut self) -> Option<Self::Item> {
-                match self {
-                    Output::Once(it) => it.next(),
-                    Output::Xiph(it) => it.next(),
-                    Output::Xiph2(it) => it.next(),
-                    Output::Ebml(it) => it.next(),
-                    Output::Ebml2(it) => it.next(),
-                    Output::FixedSize(it) => it.next(),
-                    Output::FixedSize2(it) => it.next(),
-                }
-            }
-        }
-
+    /// Converts the block into a single frame, placing delaced frames into a FrameData::Multiple.
+    fn into_frame(self, cluster_ts: u64) -> crate::Result<Frame<'a>> {
         match self {
             BlockRef::Simple(block) => {
                 let body_buf = &mut &block[..];
-
-                let track_number = match VInt64::decode(body_buf) {
-                    Ok(num) => num,
-                    Err(e) => return Output::Once(std::iter::once(Err(e))),
-                };
-
-                let relative_timestamp = match i16::decode(body_buf) {
-                    Ok(ts) => ts,
-                    Err(e) => return Output::Once(std::iter::once(Err(e))),
-                };
-
-                let flag = match u8::decode(body_buf) {
-                    Ok(f) => f,
-                    Err(e) => return Output::Once(std::iter::once(Err(e))),
-                };
-
+                let track_number = VInt64::decode(body_buf)?;
+                let relative_timestamp = i16::decode(body_buf)?;
+                let flag = u8::decode(body_buf)?;
                 let data = *body_buf;
-
                 let lacing = (flag >> 1) & 0x03;
-
-                if lacing == 0 {
-                    // no lacing, single frame
-                    Output::Once(std::iter::once(Ok(Frame {
-                        data,
-                        is_keyframe: (flag & 0x80) != 0,
-                        is_invisible: (flag & 0x08) != 0,
-                        is_discardable: (flag & 0x01) != 0,
-                        track_number: *track_number,
-                        timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                        duration: None,
-                    })))
-                } else if lacing == 0b01 {
-                    let data = match Lacer::Xiph.delace(data) {
-                        Ok(frames) => frames,
-                        Err(e) => return Output::Once(std::iter::once(Err(e))),
-                    };
-
-                    Output::Xiph(data.into_iter().map(move |d| {
-                        Ok(Frame {
-                            data: d,
-                            is_keyframe: (flag & 0x80) != 0,
-                            is_invisible: (flag & 0x08) != 0,
-                            is_discardable: (flag & 0x01) != 0,
-                            track_number: *track_number,
-                            timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                            duration: None,
-                        })
-                    }))
-                } else if lacing == 0b11 {
-                    // EBML lacing
-                    let data = match Lacer::Ebml.delace(data) {
-                        Ok(frames) => frames,
-                        Err(e) => return Output::Once(std::iter::once(Err(e))),
-                    };
-                    Output::Ebml(data.into_iter().map(move |d| {
-                        Ok(Frame {
-                            data: d,
-                            is_keyframe: (flag & 0x80) != 0,
-                            is_invisible: (flag & 0x08) != 0,
-                            is_discardable: (flag & 0x01) != 0,
-                            track_number: *track_number,
-                            timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                            duration: None,
-                        })
-                    }))
-                } else {
-                    // fixed-size lacing
-                    let data = match Lacer::FixedSize.delace(data) {
-                        Ok(frames) => frames,
-                        Err(e) => return Output::Once(std::iter::once(Err(e))),
-                    };
-                    Output::FixedSize(data.into_iter().map(move |d| {
-                        Ok(Frame {
-                            data: d,
-                            is_keyframe: (flag & 0x80) != 0,
-                            is_invisible: (flag & 0x08) != 0,
-                            is_discardable: (flag & 0x01) != 0,
-                            track_number: *track_number,
-                            timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                            duration: None,
-                        })
-                    }))
-                }
+                Ok(Frame {
+                    data: match lacing {
+                        0 => FrameData::single(data),
+                        0b01 => FrameData::multiple(Lacer::Xiph.delace(data)?),
+                        0b11 => FrameData::multiple(Lacer::Ebml.delace(data)?),
+                        _ => FrameData::multiple(Lacer::FixedSize.delace(data)?),
+                    },
+                    is_keyframe: (flag & 0x80) != 0,
+                    is_invisible: (flag & 0x08) != 0,
+                    is_discardable: (flag & 0x01) != 0,
+                    track_number: *track_number,
+                    timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                    duration: None,
+                })
             }
             BlockRef::Group(g) => {
                 let block = &g.block;
                 let body_buf = &mut &block[..];
-
-                let track_number = match VInt64::decode(body_buf) {
-                    Ok(num) => num,
-                    Err(e) => return Output::Once(std::iter::once(Err(e))),
-                };
-
-                let relative_timestamp = match i16::decode(body_buf) {
-                    Ok(ts) => ts,
-                    Err(e) => return Output::Once(std::iter::once(Err(e))),
-                };
-
-                let flag = match u8::decode(body_buf) {
-                    Ok(f) => f,
-                    Err(e) => return Output::Once(std::iter::once(Err(e))),
-                };
-
+                let track_number = VInt64::decode(body_buf)?;
+                let relative_timestamp = i16::decode(body_buf)?;
+                let flag = u8::decode(body_buf)?;
                 let data = *body_buf;
                 let lacing = (flag >> 1) & 0x03;
-                if lacing == 0 {
-                    // no lacing
-                    Output::Once(std::iter::once(Ok(Frame {
-                        data,
-                        is_keyframe: g.reference_block.is_empty(),
-                        is_invisible: flag & 0x08 != 0,
-                        is_discardable: false,
-                        track_number: *track_number,
-                        timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                        duration: g.block_duration.and_then(|d| NonZero::new(*d)),
-                    })))
-                } else if lacing == 0b01 {
-                    let data = match Lacer::Xiph.delace(data) {
-                        Ok(frames) => frames,
-                        Err(e) => return Output::Once(std::iter::once(Err(e))),
-                    };
 
-                    Output::Xiph2(data.into_iter().map(move |d| {
-                        Ok(Frame {
-                            data: d,
-                            is_keyframe: g.reference_block.is_empty(),
-                            is_invisible: flag & 0x08 != 0,
-                            is_discardable: false,
-                            track_number: *track_number,
-                            timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                            duration: g.block_duration.and_then(|d| NonZero::new(*d)),
-                        })
-                    }))
-                } else if lacing == 0b11 {
-                    let data = match Lacer::Ebml.delace(data) {
-                        Ok(frames) => frames,
-                        Err(e) => return Output::Once(std::iter::once(Err(e))),
-                    };
-                    Output::Ebml2(data.into_iter().map(move |d| {
-                        Ok(Frame {
-                            data: d,
-                            is_keyframe: g.reference_block.is_empty(),
-                            is_invisible: flag & 0x08 != 0,
-                            is_discardable: false,
-                            track_number: *track_number,
-                            timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                            duration: g.block_duration.and_then(|d| NonZero::new(*d)),
-                        })
-                    }))
-                } else {
-                    let data = match Lacer::FixedSize.delace(data) {
-                        Ok(frames) => frames,
-                        Err(e) => return Output::Once(std::iter::once(Err(e))),
-                    };
-                    Output::FixedSize2(data.into_iter().map(move |d| {
-                        Ok(Frame {
-                            data: d,
-                            is_keyframe: g.reference_block.is_empty(),
-                            is_invisible: flag & 0x08 != 0,
-                            is_discardable: false,
-                            track_number: *track_number,
-                            timestamp: cluster_ts as i64 + relative_timestamp as i64,
-                            duration: g.block_duration.and_then(|d| NonZero::new(*d)),
-                        })
-                    }))
-                }
+                Ok(Frame {
+                    data: match lacing {
+                        0 => FrameData::single(data),
+                        0b01 => FrameData::multiple(Lacer::Xiph.delace(data)?),
+                        0b11 => FrameData::multiple(Lacer::Ebml.delace(data)?),
+                        _ => FrameData::multiple(Lacer::FixedSize.delace(data)?),
+                    },
+                    is_keyframe: g.reference_block.is_empty(),
+                    is_invisible: flag & 0x08 != 0,
+                    is_discardable: false,
+                    track_number: *track_number,
+                    timestamp: cluster_ts as i64 + relative_timestamp as i64,
+                    duration: g.block_duration.and_then(|d| NonZero::new(*d)),
+                })
             }
         }
     }
@@ -299,7 +160,6 @@ impl Cluster {
     pub fn frames(&self) -> impl Iterator<Item = crate::Result<Frame<'_>>> + '_ {
         self.blocks
             .iter()
-            .map(|b| b.block_ref())
-            .flat_map(|b| b.into_frames(*self.timestamp))
+            .map(|b| b.block_ref().into_frame(*self.timestamp))
     }
 }
