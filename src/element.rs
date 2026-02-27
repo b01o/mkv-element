@@ -58,7 +58,7 @@ impl<T: Element> Encode for T {
 }
 
 impl<T: Element> ReadFrom for T {
-    fn read_from<R: std::io::Read>(r: &mut R) -> crate::Result<Self> {
+    fn read_from<R: std::io::Read + ?Sized>(r: &mut R) -> crate::Result<Self> {
         let header = Header::read_from(r)?;
         let body = header.read_body(r)?;
         let element = match T::decode_body(&mut &body[..]) {
@@ -74,7 +74,9 @@ impl<T: Element> ReadFrom for T {
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl<T: Element> crate::io::tokio_impl::AsyncReadFrom for T {
-    async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
+    async fn async_read_from<R: tokio::io::AsyncRead + Unpin + ?Sized>(
+        r: &mut R,
+    ) -> crate::Result<Self> {
         let header = Header::async_read_from(r).await?;
         let body = header.read_body_tokio(r).await?;
         let element = match T::decode_body(&mut &body[..]) {

@@ -123,7 +123,7 @@ impl VInt64 {
 }
 
 impl ReadFrom for VInt64 {
-    fn read_from<R: std::io::Read>(r: &mut R) -> crate::Result<Self> {
+    fn read_from<R: std::io::Read + ?Sized>(r: &mut R) -> crate::Result<Self> {
         let mut first_byte_buf = [0u8; 1];
         r.read_exact(&mut first_byte_buf)?;
         let first_byte = first_byte_buf[0];
@@ -162,7 +162,9 @@ impl ReadFrom for VInt64 {
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl crate::io::tokio_impl::AsyncReadFrom for VInt64 {
-    async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
+    async fn async_read_from<R: tokio::io::AsyncRead + Unpin + ?Sized>(
+        r: &mut R,
+    ) -> crate::Result<Self> {
         let mut first_byte_buf = [0u8; 1];
         tokio::io::AsyncReadExt::read_exact(r, &mut first_byte_buf).await?;
         let first_byte = first_byte_buf[0];
@@ -391,7 +393,7 @@ pub struct Header {
 }
 
 impl ReadFrom for Header {
-    fn read_from<R: std::io::Read>(reader: &mut R) -> crate::Result<Self> {
+    fn read_from<R: std::io::Read + ?Sized>(reader: &mut R) -> crate::Result<Self> {
         let id = VInt64::read_from(reader)?;
         let size = VInt64::read_from(reader)?;
         Ok(Self { id, size })
@@ -401,7 +403,9 @@ impl ReadFrom for Header {
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl crate::io::tokio_impl::AsyncReadFrom for Header {
-    async fn async_read_from<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> crate::Result<Self> {
+    async fn async_read_from<R: tokio::io::AsyncRead + Unpin + ?Sized>(
+        r: &mut R,
+    ) -> crate::Result<Self> {
         let id = VInt64::async_read_from(r).await?;
         let size = VInt64::async_read_from(r).await?;
         Ok(Self { id, size })

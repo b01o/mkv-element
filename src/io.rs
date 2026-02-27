@@ -13,13 +13,13 @@ pub mod blocking_impl {
     /// Read from a reader.
     pub trait ReadFrom: Sized {
         /// Read Self from a reader.
-        fn read_from<R: Read>(r: &mut R) -> crate::Result<Self>;
+        fn read_from<R: Read + ?Sized>(r: &mut R) -> crate::Result<Self>;
     }
 
     /// Read an element from a reader provided the header.
     pub trait ReadElement: Sized + Element {
         /// Read an element from a reader provided the header.
-        fn read_element<R: Read>(header: &Header, r: &mut R) -> crate::Result<Self> {
+        fn read_element<R: Read + ?Sized>(header: &Header, r: &mut R) -> crate::Result<Self> {
             let body = header.read_body(r)?;
             Self::decode_body(&mut &body[..])
         }
@@ -28,7 +28,7 @@ pub mod blocking_impl {
 
     impl Header {
         /// Read the body of the element from a reader into memory.
-        pub(crate) fn read_body<R: Read>(&self, r: &mut R) -> crate::Result<Vec<u8>> {
+        pub(crate) fn read_body<R: Read + ?Sized>(&self, r: &mut R) -> crate::Result<Vec<u8>> {
             // Segment and Cluster can have unknown size, but we don't support that here.
             let size = if self.size.is_unknown && [Segment::ID, Cluster::ID].contains(&self.id) {
                 return Err(crate::Error::ElementBodySizeUnknown(self.id));
@@ -49,11 +49,11 @@ pub mod blocking_impl {
     /// Write to a writer.
     pub trait WriteTo {
         /// Write to a writer.
-        fn write_to<W: Write>(&self, w: &mut W) -> crate::Result<()>;
+        fn write_to<W: Write + ?Sized>(&self, w: &mut W) -> crate::Result<()>;
     }
 
     impl<T: Encode> WriteTo for T {
-        fn write_to<W: Write>(&self, w: &mut W) -> crate::Result<()> {
+        fn write_to<W: Write + ?Sized>(&self, w: &mut W) -> crate::Result<()> {
             //TODO should avoid the extra allocation here
             let mut buf = vec![];
             self.encode(&mut buf)?;
@@ -65,7 +65,11 @@ pub mod blocking_impl {
     /// Write an element to a writer provided the header.
     pub trait WriteElement: Sized + Element {
         /// Write an element to a writer.
-        fn write_element<W: Write>(&self, header: &Header, w: &mut W) -> crate::Result<()> {
+        fn write_element<W: Write + ?Sized>(
+            &self,
+            header: &Header,
+            w: &mut W,
+        ) -> crate::Result<()> {
             header.write_to(w)?;
             let mut buf = vec![];
             self.encode_body(&mut buf)?;
@@ -91,7 +95,7 @@ pub mod tokio_impl {
     /// Read from a reader asynchronously.
     pub trait AsyncReadFrom: Sized {
         /// Read Self from a reader.
-        fn async_read_from<R: tokio::io::AsyncRead + Unpin>(
+        fn async_read_from<R: tokio::io::AsyncRead + Unpin + ?Sized>(
             r: &mut R,
         ) -> impl Future<Output = crate::Result<Self>>;
     }
@@ -99,7 +103,7 @@ pub mod tokio_impl {
     /// Read an element from a reader provided the header asynchronously.
     pub trait AsyncReadElement: Sized + Element {
         /// Read an element from a reader provided the header.
-        fn async_read_element<R: tokio::io::AsyncRead + Unpin>(
+        fn async_read_element<R: tokio::io::AsyncRead + Unpin + ?Sized>(
             header: &Header,
             r: &mut R,
         ) -> impl std::future::Future<Output = crate::Result<Self>> {
@@ -114,14 +118,14 @@ pub mod tokio_impl {
     /// Write to a writer asynchronously.
     pub trait AsyncWriteTo {
         /// Write to a writer asynchronously.
-        fn async_write_to<W: tokio::io::AsyncWrite + Unpin>(
+        fn async_write_to<W: tokio::io::AsyncWrite + Unpin + ?Sized>(
             &self,
             w: &mut W,
         ) -> impl std::future::Future<Output = crate::Result<()>>;
     }
 
     impl<T: crate::functional::Encode> AsyncWriteTo for T {
-        async fn async_write_to<W: tokio::io::AsyncWrite + Unpin>(
+        async fn async_write_to<W: tokio::io::AsyncWrite + Unpin + ?Sized>(
             &self,
             w: &mut W,
         ) -> crate::Result<()> {
@@ -135,7 +139,7 @@ pub mod tokio_impl {
     /// Write an element to a writer provided the header asynchronously.
     pub trait AsyncWriteElement: Sized + Element {
         /// Write an element to a writer asynchronously.
-        fn async_write_element<W: tokio::io::AsyncWrite + Unpin>(
+        fn async_write_element<W: tokio::io::AsyncWrite + Unpin + ?Sized>(
             &self,
             header: &Header,
             w: &mut W,
@@ -152,7 +156,7 @@ pub mod tokio_impl {
 
     impl Header {
         /// Read the body of the element from a reader into memory.
-        pub(crate) async fn read_body_tokio<R: AsyncRead + Unpin>(
+        pub(crate) async fn read_body_tokio<R: AsyncRead + Unpin + ?Sized>(
             &self,
             r: &mut R,
         ) -> crate::Result<Vec<u8>> {

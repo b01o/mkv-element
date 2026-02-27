@@ -19,7 +19,7 @@ impl MatroskaView {
     /// but skipping Cluster data to avoid loading it into memory.
     pub fn new<R>(reader: &mut R) -> crate::Result<Self>
     where
-        R: std::io::Read + std::io::Seek,
+        R: std::io::Read + std::io::Seek + ?Sized,
     {
         use crate::io::blocking_impl::*;
 
@@ -43,7 +43,7 @@ impl MatroskaView {
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn new_async<R>(reader: &mut R) -> crate::Result<Self>
     where
-        R: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
+        R: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin + ?Sized,
     {
         use crate::io::tokio_impl::*;
 
@@ -85,7 +85,7 @@ impl SegmentView {
     /// but skipping Cluster data to avoid loading it into memory.
     pub fn new<R>(reader: &mut R) -> crate::Result<Vec<Self>>
     where
-        R: std::io::Read + std::io::Seek,
+        R: std::io::Read + std::io::Seek + ?Sized,
     {
         let mut out = vec![];
 
@@ -214,7 +214,7 @@ impl SegmentView {
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn new_async<R>(reader: &mut R) -> crate::Result<Vec<Self>>
     where
-        R: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin,
+        R: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin + ?Sized,
     {
         let mut out = vec![];
 
