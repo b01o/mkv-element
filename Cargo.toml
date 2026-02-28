@@ -35,7 +35,10 @@ roxmltree = "0.21.0"
 hexf      = "0.2.1"
 
 [package.metadata.cargo-shear]
-ignored = ["tokio-test"]
+ignored = [
+    "tokio-test", # Only used for testing, not a public API.
+    "hexf",       # Used in generated code, cargo shear doesn't know about it.
+]
 
 [package.metadata.docs.rs]
 # RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
