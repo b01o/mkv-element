@@ -150,7 +150,7 @@ impl SegmentView {
                         })
                         .collect();
 
-                    seeks.sort_by(|a, b| a.1.cmp(&b.1));
+                    seeks.sort_by_key(|a| a.1);
 
                     // find position larger than first_cluster_position
                     if let Some(pos) = seeks.iter().find(|(_, pos)| *pos > first_cluster_position) {
@@ -287,7 +287,7 @@ impl SegmentView {
                         })
                         .collect();
 
-                    seeks.sort_by(|a, b| a.1.cmp(&b.1));
+                    seeks.sort_by_key(|a| a.1);
 
                     // find position larger than first_cluster_position
                     if let Some(pos) = seeks.iter().find(|(_, pos)| *pos > first_cluster_position) {

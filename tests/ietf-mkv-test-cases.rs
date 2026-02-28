@@ -1,5 +1,5 @@
 use core::panic;
-use std::io::*;
+use std::io::{Read, Seek, sink};
 
 use mkv_element::ClusterBlock;
 use mkv_element::io::blocking_impl::*;
@@ -200,7 +200,7 @@ fn ietf_test_4() {
     // this segment starts with 134 bytes of junk data (0x0a)
     // since we only test the parsing ability, we can skip them
     // in real world usage, you may want to handle them properly
-    copy(&mut (&mut file).take(134), &mut sink()).unwrap();
+    std::io::copy(&mut (&mut file).take(134), &mut sink()).unwrap();
 
     let mut seekhead: Vec<SeekHead> = Vec::new();
     let mut info: Option<Info> = None;
@@ -274,7 +274,8 @@ fn ietf_test_4() {
                         }
                         _ => {
                             // unexpected element skip
-                            copy(&mut (&mut file).take(*header.size), &mut sink()).unwrap();
+                            std::io::copy(&mut (&mut file).take(*header.size), &mut sink())
+                                .unwrap();
                         }
                     }
                 }
