@@ -1,6 +1,6 @@
 //! Handler for lacing and delacing operations on frame data.
 
-use crate::{Error, base::VInt64, functional::Encode, io::blocking_impl::ReadFrom};
+use crate::{Error, base::VInt64, io::blocking_impl::ReadFrom, *};
 
 // https://www.matroska.org/technical/notes.html
 /// Handler for lacing and delacing operations on frame data.

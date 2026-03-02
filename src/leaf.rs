@@ -2,13 +2,14 @@
 #![allow(clippy::derivable_impls)] // auto-generated code may have derivable impls
 use crate::base::VInt64;
 use crate::element::Element;
-use crate::functional::*;
+
+use bytes::*;
 
 mod uint {
     #![allow(dead_code)]
+    use super::*;
+    use crate::{base::VInt64, element::Element};
     use std::ops::Deref;
-
-    use crate::{base::VInt64, element::Element, functional::Buf};
 
     /// Bottom type for *unsigned integers*.
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -22,26 +23,26 @@ mod uint {
 
     impl Element for UnsignedInteger {
         const ID: VInt64 = VInt64::from_encoded(0x12);
-        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-            if buf.is_empty() {
+        fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            if !buf.has_remaining() {
                 return Ok(Self(0));
             }
-            if buf.len() > 8 {
+            if buf.remaining() > 8 {
                 return Err(crate::Error::UnderDecode(Self::ID));
             }
-            let len = buf.len().min(8);
+            let len = buf.remaining().min(8);
             let mut value = [0u8; 8];
-            value[8 - len..].copy_from_slice(&buf[..len]);
+            value[8 - len..].copy_from_slice(&buf.chunk()[..len]);
             buf.advance(len);
             Ok(Self(u64::from_be_bytes(value)))
         }
-        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+        fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
             let bytes = self.0.to_be_bytes();
             let first_non_zero = bytes
                 .iter()
                 .position(|&b| b != 0)
                 .unwrap_or(bytes.len() - 1);
-            buf.append_slice(&bytes[first_non_zero..]);
+            buf.put_slice(&bytes[first_non_zero..]);
             Ok(())
         }
     }
@@ -76,9 +77,9 @@ mod uint {
 
 mod sint {
     #![allow(dead_code)]
+    use super::*;
+    use crate::{base::VInt64, element::Element};
     use std::ops::Deref;
-
-    use crate::{base::VInt64, element::Element, functional::Buf};
 
     /// Bottom type for *signed integers*.
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -92,35 +93,35 @@ mod sint {
 
     impl Element for SignedInteger {
         const ID: VInt64 = VInt64::from_encoded(0x13);
-        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-            if buf.is_empty() {
+        fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            if !buf.has_remaining() {
                 return Ok(Self(0));
             }
-            if buf.len() > 8 {
+            if buf.remaining() > 8 {
                 return Err(crate::Error::UnderDecode(Self::ID));
             }
-            let len = buf.len().min(8);
-            let is_neg = (buf[0] & 0x80) != 0;
+            let len = buf.remaining().min(8);
+            let is_neg = (buf.chunk()[0] & 0x80) != 0;
             let mut value = if is_neg { [0xFFu8; 8] } else { [0u8; 8] };
-            value[8 - len..].copy_from_slice(&buf[..len]);
+            value[8 - len..].copy_from_slice(&buf.chunk()[..len]);
             buf.advance(len);
             Ok(Self(i64::from_be_bytes(value)))
         }
-        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+        fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
             let bytes = self.0.to_be_bytes();
             if self.0 >= 0 {
                 let first_non_zero = bytes
                     .iter()
                     .position(|&b| b != 0)
                     .unwrap_or(bytes.len() - 1);
-                buf.append_slice(&bytes[first_non_zero..]);
+                buf.put_slice(&bytes[first_non_zero..]);
                 Ok(())
             } else {
                 let first_non_ff = bytes
                     .iter()
                     .position(|&b| b != 0xFF)
                     .unwrap_or(bytes.len() - 1);
-                buf.append_slice(&bytes[first_non_ff..]);
+                buf.put_slice(&bytes[first_non_ff..]);
                 Ok(())
             }
         }
@@ -176,9 +177,9 @@ mod sint {
 
 mod float {
     #![allow(dead_code)]
+    use super::*;
+    use crate::{base::VInt64, element::Element};
     use std::ops::Deref;
-
-    use crate::{base::VInt64, element::Element, functional::Buf};
 
     /// Bottom type for *floating point numbers*.
     #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
@@ -192,25 +193,25 @@ mod float {
 
     impl Element for Float {
         const ID: VInt64 = VInt64::from_encoded(0x14);
-        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-            match buf.len() {
+        fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            match buf.remaining() {
                 0 => Ok(Self(0.0)),
                 4 => {
                     let mut value = [0u8; 4];
-                    value.copy_from_slice(&buf[..4]);
+                    value.copy_from_slice(&buf.chunk()[..4]);
                     buf.advance(4);
                     Ok(Self(f32::from_be_bytes(value) as f64))
                 }
                 8 => {
                     let mut value = [0u8; 8];
-                    value.copy_from_slice(&buf[..8]);
+                    value.copy_from_slice(&buf.chunk()[..8]);
                     buf.advance(8);
                     Ok(Self(f64::from_be_bytes(value)))
                 }
                 _ => Err(crate::Error::UnderDecode(Self::ID)),
             }
         }
-        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+        fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
             fn can_represent_as_f32(value: f64) -> bool {
                 if value.is_infinite() || value.is_nan() {
                     return false;
@@ -227,10 +228,10 @@ mod float {
             }
 
             if can_represent_as_f32(self.0) {
-                buf.append_slice(&(self.0 as f32).to_be_bytes());
+                buf.put_slice(&(self.0 as f32).to_be_bytes());
                 Ok(())
             } else {
-                buf.append_slice(&self.0.to_be_bytes());
+                buf.put_slice(&self.0.to_be_bytes());
                 Ok(())
             }
         }
@@ -269,9 +270,9 @@ mod float {
 
 mod text {
     #![allow(dead_code)]
+    use super::*;
+    use crate::{base::VInt64, element::Element};
     use std::ops::Deref;
-
-    use crate::{base::VInt64, element::Element, functional::Buf};
 
     /// Bottom type for *text strings*.
     #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -285,14 +286,18 @@ mod text {
 
     impl Element for Text {
         const ID: VInt64 = VInt64::from_encoded(0x15);
-        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-            let first_zero = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-            let result = Self(String::from_utf8_lossy(&buf[..first_zero]).to_string());
-            buf.advance(buf.len());
+        fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            let first_zero = buf
+                .chunk()
+                .iter()
+                .position(|&b| b == 0)
+                .unwrap_or(buf.remaining());
+            let result = Self(String::from_utf8_lossy(&buf.chunk()[..first_zero]).to_string());
+            buf.advance(buf.remaining());
             Ok(result)
         }
-        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
-            buf.append_slice(self.0.as_bytes());
+        fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            buf.put_slice(self.0.as_bytes());
             Ok(())
         }
     }
@@ -304,6 +309,7 @@ mod text {
             let test_pair = [
                 (vec![], ""),
                 (vec![b'h', b'e', b'y'], "hey"),
+                (vec![b'h', b'e', b'y', 0, b'a'], "hey"),
                 ("testing utf8 ✓".as_bytes().to_vec(), "testing utf8 ✓"),
                 ("こんにちは".as_bytes().to_vec(), "こんにちは"),
                 (vec![b'h', b'e', b'y', 0, b'w'], "hey"),
@@ -328,13 +334,14 @@ mod text {
 
 mod bin {
     #![allow(dead_code)]
+    use super::*;
     use std::ops::Deref;
 
-    use crate::{base::VInt64, element::Element, functional::Buf};
+    use crate::{base::VInt64, element::Element};
 
     /// Bottom type for *binary data*.
     #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-    pub struct Bin(pub Vec<u8>);
+    pub struct Bin(pub Bytes);
     impl Deref for Bin {
         type Target = [u8];
         fn deref(&self) -> &Self::Target {
@@ -344,13 +351,11 @@ mod bin {
 
     impl Element for Bin {
         const ID: VInt64 = VInt64::from_encoded(0x16);
-        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-            let result = Self(buf.to_vec());
-            buf.advance(buf.len());
-            Ok(result)
+        fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            Ok(Self(buf.copy_to_bytes(buf.remaining())))
         }
-        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
-            buf.append_slice(&self.0);
+        fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            buf.put_slice(&self.0);
             Ok(())
         }
     }
@@ -361,16 +366,18 @@ mod bin {
         fn test_bin() {
             let test_pair = [
                 (vec![], vec![]),
-                (vec![1, 2, 3], vec![1, 2, 3]),
+                (vec![1, 2, 3], vec![1u8, 2, 3]),
                 ((0..=255).collect(), (0..=255).collect()),
             ];
 
             for (encoded, decoded) in test_pair {
                 let v = Bin::decode_body(&mut &*encoded).unwrap();
-                assert_eq!(v, Bin(decoded.clone()));
+                assert_eq!(v, Bin(Bytes::from(decoded.clone())));
 
                 let mut buf = vec![];
-                Bin(decoded.clone()).encode_body(&mut buf).unwrap();
+                Bin(Bytes::from(decoded.clone()))
+                    .encode_body(&mut buf)
+                    .unwrap();
                 assert_eq!(buf, encoded);
             }
         }
@@ -379,9 +386,9 @@ mod bin {
 
 mod date {
     #![allow(dead_code)]
+    use super::*;
+    use crate::{base::VInt64, element::Element};
     use std::ops::Deref;
-
-    use crate::{base::VInt64, element::Element, functional::Buf};
 
     /// Bottom type for *date/time values*.
     /// Represents the number of nanoseconds since the 2001-01-01T00:00:00 UTC.
@@ -396,16 +403,16 @@ mod date {
 
     impl Element for Date {
         const ID: VInt64 = VInt64::from_encoded(0x17);
-        fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-            if buf.len() != 8 {
+        fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            if buf.remaining() != 8 {
                 return Err(crate::Error::UnderDecode(Self::ID));
             }
-            let result = i64::from_be_bytes(buf[..8].try_into().unwrap());
+            let result = i64::from_be_bytes(buf.chunk()[..8].try_into().unwrap());
             buf.advance(8);
             Ok(Self(result))
         }
-        fn encode_body<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
-            buf.append_slice(&self.0.to_be_bytes());
+        fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+            buf.put_slice(&self.0.to_be_bytes());
             Ok(())
         }
     }

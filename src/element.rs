@@ -1,7 +1,8 @@
 use crate::base::*;
 use crate::error::Error;
-use crate::functional::*;
 use crate::io::blocking_impl::*;
+
+use crate::*;
 
 /// A Matroska element.
 pub trait Element: Sized {
@@ -13,23 +14,23 @@ pub trait Element: Sized {
     const HAS_DEFAULT_VALUE: bool = false;
 
     /// Decode the body of the element from a buffer.
-    fn decode_body(buf: &mut &[u8]) -> crate::Result<Self>;
+    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self>;
 
     /// Encode the body of the element to a buffer.
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()>;
 }
 
 impl<T: Element> Decode for T {
-    fn decode(buf: &mut &[u8]) -> crate::Result<Self> {
+    fn decode<B: Buf>(buf: &mut B) -> crate::Result<Self> {
         let header = Header::decode(buf)?;
         let body_size = *header.size as usize;
         if buf.remaining() < body_size {
-            return Err(crate::error::Error::OutOfBounds);
+            return Err(Error::try_get_error(body_size, buf.remaining()));
         }
-        let mut body = buf.slice(body_size);
+        let mut body = &buf.chunk()[..body_size];
         let element = match T::decode_body(&mut body) {
             Ok(e) => e,
-            Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),
+            Err(Error::TryGetError(_)) => return Err(Error::OverDecode(Self::ID)),
             Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
             Err(e) => return Err(e),
         };
@@ -52,7 +53,7 @@ impl<T: Element> Encode for T {
             size: VInt64::new(body_buf.len() as u64),
         };
         header.encode(buf)?;
-        buf.append_slice(&body_buf);
+        buf.put_slice(&body_buf);
         Ok(())
     }
 }
@@ -63,7 +64,7 @@ impl<T: Element> ReadFrom for T {
         let body = header.read_body(r)?;
         let element = match T::decode_body(&mut &body[..]) {
             Ok(e) => e,
-            Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),
+            Err(Error::TryGetError(_)) => return Err(Error::OverDecode(Self::ID)),
             Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
             Err(e) => return Err(e),
         };
@@ -81,7 +82,7 @@ impl<T: Element> crate::io::tokio_impl::AsyncReadFrom for T {
         let body = header.read_body_tokio(r).await?;
         let element = match T::decode_body(&mut &body[..]) {
             Ok(e) => e,
-            Err(Error::OutOfBounds) => return Err(Error::OverDecode(Self::ID)),
+            Err(Error::TryGetError(_)) => return Err(Error::OverDecode(Self::ID)),
             Err(Error::ShortRead) => return Err(Error::UnderDecode(Self::ID)),
             Err(e) => return Err(e),
         };

@@ -6,11 +6,17 @@ mod base; // base types for Matroska elements. ie. `VInt64`, `Header`, etc.
 mod element; // Element body definitions and traits.
 mod error;
 mod frame;
-mod functional;
+
+
 mod lacer;
 mod leaf; // Leaf elements in Matroska.
 mod master; // Master elements in Matroska.
 mod supplement; // Supplementary elements in Matroska. Void elements, CRC-32, etc.
+
+use bytes::*;
+use coding::*;
+mod coding;
+
 
 // following modules are public
 pub mod io;

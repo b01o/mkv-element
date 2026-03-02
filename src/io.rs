@@ -3,9 +3,9 @@
 /// blocking I/O implementations, supporting reading and writing.
 pub mod blocking_impl {
     use crate::{
+        *,
         base::Header,
         element::Element,
-        functional::Encode,
         master::{Cluster, Segment},
     };
     use std::io::{Read, Write};
@@ -40,7 +40,7 @@ pub mod blocking_impl {
             let mut buf = Vec::with_capacity(cap);
             let n = std::io::copy(&mut r.take(size), &mut buf)?;
             if size != n {
-                return Err(crate::Error::OutOfBounds);
+                return Err(crate::Error::try_get_error(size as usize, n as usize));
             }
             Ok(buf)
         }
@@ -84,6 +84,7 @@ pub mod blocking_impl {
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 pub mod tokio_impl {
     use crate::{
+        *,
         base::Header,
         element::Element,
         master::{Cluster, Segment},
@@ -124,7 +125,7 @@ pub mod tokio_impl {
         ) -> impl std::future::Future<Output = crate::Result<()>>;
     }
 
-    impl<T: crate::functional::Encode> AsyncWriteTo for T {
+    impl<T: Encode> AsyncWriteTo for T {
         async fn async_write_to<W: tokio::io::AsyncWrite + Unpin + ?Sized>(
             &self,
             w: &mut W,
@@ -171,7 +172,7 @@ pub mod tokio_impl {
             let mut buf = Vec::with_capacity(cap);
             let n = tokio::io::copy(&mut r.take(size), &mut buf).await?;
             if size != n {
-                return Err(crate::Error::OutOfBounds);
+                return Err(crate::Error::try_get_error(size as usize, n as usize));
             }
             Ok(buf)
         }

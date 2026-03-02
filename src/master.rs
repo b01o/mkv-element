@@ -2,9 +2,10 @@ use crate::Error;
 use crate::base::*;
 use crate::element::*;
 use crate::frame::ClusterBlock;
-use crate::functional::*;
 use crate::leaf::*;
 use crate::supplement::*;
+
+use crate::*;
 
 // A helper for generating nested elements.
 /* example:
@@ -17,8 +18,8 @@ nested! {
 macro_rules! nested {
     (required: [$($required:ident),*$(,)?], optional: [$($optional:ident),*$(,)?], multiple: [$($multiple:ident),*$(,)?],) => {
         paste::paste! {
-            fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-                let crc32 = if buf.len() > 6 && buf[0] == 0xBF && buf[1] == 0x84 {
+            fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+                let crc32 = if buf.remaining() > 6 && buf.chunk()[0] == 0xBF && buf.chunk()[1] == 0x84 {
                     Some(Crc32::decode(buf)?)
                 } else {
                     None
@@ -30,29 +31,38 @@ macro_rules! nested {
                 let mut void: Option<Void> = None;
 
                 while let Ok(header) = Header::decode(buf) {
-                    if *header.size > buf.len() as u64 {
-                        return Err(Error::OverDecode(header.id));
+                    if *header.size > buf.remaining() as u64 {
+                        return Err(Error::try_get_error(*header.size as usize, buf.remaining()));
                     }
+                    let body_size = *header.size as usize;
                     match header.id {
                         $( $required::ID => {
                             if [<$required:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                [<$required:snake>] = Some($required::decode_element(&header, buf)?)
+                                let mut body = &buf.chunk()[..body_size];
+                                [<$required:snake>] = Some($required::decode_body(&mut body)?);
+                                buf.advance(body_size);
                             }
                         } )*
                         $( $optional::ID => {
                             if [<$optional:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                [<$optional:snake>] = Some($optional::decode_element(&header, buf)?)
+                                let mut body = &buf.chunk()[..body_size];
+                                [<$optional:snake>] = Some($optional::decode_body(&mut body)?);
+                                buf.advance(body_size);
                             }
                         } )*
                         $( $multiple::ID => {
-                            [<$multiple:snake>].push($multiple::decode_element(&header, buf)?);
+                            let mut body = &buf.chunk()[..body_size];
+                            [<$multiple:snake>].push($multiple::decode_body(&mut body)?);
+                            buf.advance(body_size);
                         } )*
                         Void::ID => {
-                            let v = Void::decode_element(&header, buf)?;
+                            let mut body = &buf.chunk()[..body_size];
+                            let v = Void::decode_body(&mut body)?;
+                            buf.advance(body_size);
                             if let Some(previous) = void {
                                 void = Some(Void { size: previous.size + v.size });
                             } else {
@@ -301,8 +311,8 @@ pub struct Cluster {
 // Here we manually implement Element for Cluster, aggregating both SimpleBlock and BlockGroup into ClusterBlock, preserving their order.
 impl Element for Cluster {
     const ID: VInt64 = VInt64::from_encoded(0x1F43B675);
-    fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-        let crc32 = if buf.len() > 6 && buf[0] == 0xBF && buf[1] == 0x84 {
+    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+        let crc32 = if buf.remaining() > 6 && buf.chunk()[0] == 0xBF && buf.chunk()[1] == 0x84 {
             Some(Crc32::decode(buf)?)
         } else {
             None
@@ -316,9 +326,10 @@ impl Element for Cluster {
         let mut void: Option<Void> = None;
 
         while let Ok(header) = Header::decode(buf) {
-            if *header.size > buf.len() as u64 {
+            if *header.size > buf.remaining() as u64 {
                 return Err(Error::OverDecode(header.id));
             }
+            let body_size = *header.size as usize;
             match header.id {
                 Timestamp::ID => {
                     if timestamp.is_some() {
@@ -327,7 +338,9 @@ impl Element for Cluster {
                             parent: Self::ID,
                         });
                     } else {
-                        timestamp = Some(Timestamp::decode_element(&header, buf)?)
+                        let mut body = &buf.chunk()[..body_size];
+                        timestamp = Some(Timestamp::decode_body(&mut body)?);
+                        buf.advance(body_size);
                     }
                 }
                 Position::ID => {
@@ -337,7 +350,9 @@ impl Element for Cluster {
                             parent: Self::ID,
                         });
                     } else {
-                        position = Some(Position::decode_element(&header, buf)?)
+                        let mut body = &buf.chunk()[..body_size];
+                        position = Some(Position::decode_body(&mut body)?);
+                        buf.advance(body_size);
                     }
                 }
                 PrevSize::ID => {
@@ -347,17 +362,25 @@ impl Element for Cluster {
                             parent: Self::ID,
                         });
                     } else {
-                        prev_size = Some(PrevSize::decode_element(&header, buf)?)
+                        let mut body = &buf.chunk()[..body_size];
+                        prev_size = Some(PrevSize::decode_body(&mut body)?);
+                        buf.advance(body_size);
                     }
                 }
                 SimpleBlock::ID => {
-                    blocks.push(SimpleBlock::decode_element(&header, buf)?.into());
+                    let mut body = &buf.chunk()[..body_size];
+                    blocks.push(SimpleBlock::decode_body(&mut body)?.into());
+                    buf.advance(body_size);
                 }
                 BlockGroup::ID => {
-                    blocks.push(BlockGroup::decode_element(&header, buf)?.into());
+                    let mut body = &buf.chunk()[..body_size];
+                    blocks.push(BlockGroup::decode_body(&mut body)?.into());
+                    buf.advance(body_size);
                 }
                 Void::ID => {
-                    let v = Void::decode_element(&header, buf)?;
+                    let mut body = &buf.chunk()[..body_size];
+                    let v = Void::decode_body(&mut body)?;
+                    buf.advance(body_size);
                     if let Some(previous) = void {
                         void = Some(Void {
                             size: previous.size + v.size,

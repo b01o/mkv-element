@@ -2,7 +2,8 @@ use std::ops::Deref;
 
 use crate::base::VInt64;
 use crate::element::Element;
-use crate::functional::*;
+
+use crate::*;
 
 /// Ebml Void element, used for padding.
 ///
@@ -18,13 +19,13 @@ pub struct Void {
 }
 impl Element for Void {
     const ID: VInt64 = VInt64::from_encoded(0xEC);
-    fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
-        let len = buf.len() as u64;
-        buf.advance(buf.len());
-        Ok(Self { size: len })
+    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+        let len = buf.remaining();
+        buf.advance(len);
+        Ok(Self { size: len as u64 })
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
-        buf.append_slice(&vec![0; self.size as usize]);
+        buf.put_slice(&vec![0; self.size as usize]);
         Ok(())
     }
 }
@@ -44,12 +45,12 @@ impl Deref for Crc32 {
 }
 impl Element for Crc32 {
     const ID: VInt64 = VInt64::from_encoded(0xBF);
-    fn decode_body(buf: &mut &[u8]) -> crate::Result<Self> {
+    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
         let buf = <[u8; 4]>::decode(buf)?;
         Ok(Self(u32::from_le_bytes(buf)))
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
-        buf.append_slice(&self.0.to_le_bytes());
+        buf.put_slice(&self.0.to_le_bytes());
         Ok(())
     }
 }

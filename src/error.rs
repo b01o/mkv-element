@@ -14,7 +14,7 @@ pub enum Error {
 
     /// Attempted to read past the end of the buffer.
     #[error("Attempted to read past the end of the buffer")]
-    OutOfBounds,
+    TryGetError(#[from] bytes::TryGetError),
 
     /// Attempted to read past the end of the buffer during element body decoding.
     #[error("Element body over decode, ID: {0}")]
@@ -48,6 +48,17 @@ pub enum Error {
     /// Malformed lacing data.
     #[error("Malformed lacing data")]
     MalformedLacingData,
+}
+
+impl Error {
+    /// Helper function to create a TryGetError with the requested and available sizes.
+    #[inline]
+    pub fn try_get_error(requested: usize, available: usize) -> Self {
+        Error::TryGetError(bytes::TryGetError {
+            requested,
+            available,
+        })
+    }
 }
 
 /// Result type for this crate.

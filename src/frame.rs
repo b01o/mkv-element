@@ -2,10 +2,10 @@ use std::num::NonZero;
 
 use crate::{
     base::VInt64,
-    functional::{Decode, Encode},
     lacer::Lacer,
     leaf::SimpleBlock,
     master::{BlockGroup, Cluster},
+    *,
 };
 
 /// Frame data, either a single frame or multiple frames (in case of lacing)
@@ -77,7 +77,7 @@ impl From<BlockGroup> for ClusterBlock {
 }
 
 impl Encode for ClusterBlock {
-    fn encode<B: crate::functional::BufMut>(&self, buf: &mut B) -> crate::Result<()> {
+    fn encode<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
         match self {
             ClusterBlock::Simple(b) => b.encode(buf),
             ClusterBlock::Group(b) => b.encode(buf),
@@ -97,8 +97,8 @@ impl<'a> BlockRef<'a> {
             BlockRef::Simple(block) => {
                 let body_buf = &mut &block[..];
                 let track_number = VInt64::decode(body_buf)?;
-                let relative_timestamp = i16::decode(body_buf)?;
-                let flag = u8::decode(body_buf)?;
+                let relative_timestamp = body_buf.try_get_i16()?;
+                let flag = body_buf.try_get_u8()?;
                 let data = *body_buf;
                 let lacing = (flag >> 1) & 0x03;
                 Ok(Frame {
@@ -120,8 +120,8 @@ impl<'a> BlockRef<'a> {
                 let block = &g.block;
                 let body_buf = &mut &block[..];
                 let track_number = VInt64::decode(body_buf)?;
-                let relative_timestamp = i16::decode(body_buf)?;
-                let flag = u8::decode(body_buf)?;
+                let relative_timestamp = body_buf.try_get_i16()?;
+                let flag = body_buf.try_get_u8()?;
                 let data = *body_buf;
                 let lacing = (flag >> 1) & 0x03;
 

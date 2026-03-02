@@ -1,6 +1,8 @@
 use crate::error::Error;
-use crate::functional::*;
 use crate::io::blocking_impl::*;
+
+use crate::*;
+
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::ops::Deref;
@@ -201,11 +203,8 @@ impl crate::io::tokio_impl::AsyncReadFrom for VInt64 {
 }
 
 impl Decode for VInt64 {
-    fn decode(buf: &mut &[u8]) -> crate::Result<Self> {
-        if !buf.has_remaining() {
-            return Err(Error::OutOfBounds);
-        }
-        let first_byte = u8::decode(buf)?;
+    fn decode<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+        let first_byte = buf.try_get_u8()?;
         if first_byte == 0 {
             return Err(Error::InvalidVInt);
         }
@@ -224,11 +223,11 @@ impl Decode for VInt64 {
             })
         } else {
             if buf.remaining() < leading_zeros {
-                return Err(Error::OutOfBounds);
+                return Err(Error::try_get_error(leading_zeros, buf.remaining()));
             }
             let mut bytes = [0u8; 8];
             let read_buf = &mut bytes[8 - leading_zeros..];
-            read_buf.copy_from_slice(buf.slice(leading_zeros));
+            read_buf.copy_from_slice(&buf.chunk()[..leading_zeros]);
 
             if leading_zeros != 7 {
                 bytes[8 - leading_zeros - 1] = first_byte & (0xFF >> (leading_zeros + 1));
@@ -245,11 +244,11 @@ impl Decode for VInt64 {
 impl Encode for VInt64 {
     fn encode<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
         if self.is_unknown {
-            buf.append_slice(&[0xFF]);
+            buf.put_slice(&[0xFF]);
             return Ok(());
         }
         if self.value == 127 {
-            buf.append_slice(&[0x40, 0x7F]);
+            buf.put_slice(&[0x40, 0x7F]);
             return Ok(());
         }
 
@@ -258,15 +257,13 @@ impl Encode for VInt64 {
         let slice = &mut sbuf[8 - size..];
         slice.copy_from_slice(&self.value.to_be_bytes()[8 - size..]);
         slice[0] |= 1u8 << (8 - size);
-        buf.append_slice(slice);
+        buf.put_slice(slice);
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::functional::{Decode, Encode};
-
     use super::*;
     use std::convert::TryInto;
 
@@ -348,7 +345,7 @@ mod tests {
 
             // test decode
             let ecoded2 = encoded.clone();
-            let mut slice_encoded2 = &ecoded2[..];
+            let mut slice_encoded2 = Bytes::from(ecoded2);
             let vint_decoded = VInt64::decode(&mut slice_encoded2).unwrap();
             assert_eq!(*vint_decoded, val);
 
@@ -413,7 +410,7 @@ impl crate::io::tokio_impl::AsyncReadFrom for Header {
 }
 
 impl Decode for Header {
-    fn decode(buf: &mut &[u8]) -> crate::Result<Self> {
+    fn decode<B: Buf>(buf: &mut B) -> crate::Result<Self> {
         let id = VInt64::decode(buf)?;
         let size = VInt64::decode(buf)?;
         Ok(Self { id, size })
