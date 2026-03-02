@@ -19,66 +19,10 @@ impl<const N: usize> Decode for [u8; N] {
     }
 }
 
-
 /// Encode an element to a buffer.
 pub trait Encode {
     /// Encode self to the buffer.
     fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()>;
-}
-
-impl Encode for u8 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for i8 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for i16 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for u16 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for u32 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for i32 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for u64 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl Encode for i64 {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.to_be_bytes().encode(buf)
-    }
-}
-
-impl<const N: usize> Encode for [u8; N] {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        buf.put_slice(self);
-        Ok(())
-    }
 }
 
 impl<T: Encode> Encode for &[T] {
@@ -97,14 +41,6 @@ impl<T: Encode> Encode for Option<T> {
             Some(v) => v.encode(buf),
             None => Ok(()),
         }
-    }
-}
-
-impl Encode for &str {
-    fn encode<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        self.as_bytes().encode(buf)?;
-        0u8.encode(buf)?;
-        Ok(())
     }
 }
 
