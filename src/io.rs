@@ -3,10 +3,10 @@
 /// blocking I/O implementations, supporting reading and writing.
 pub mod blocking_impl {
     use crate::{
-        *,
         base::Header,
         element::Element,
         master::{Cluster, Segment},
+        *,
     };
     use std::io::{Read, Write};
 
@@ -84,10 +84,10 @@ pub mod blocking_impl {
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 pub mod tokio_impl {
     use crate::{
-        *,
         base::Header,
         element::Element,
         master::{Cluster, Segment},
+        *,
     };
 
     use std::future::Future;

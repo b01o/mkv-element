@@ -20,17 +20,6 @@ impl<const N: usize> Decode for [u8; N] {
 }
 
 
-// impl<T: Decode> Decode for Vec<T> {
-//     fn decode(buf: Bytes) -> Result<Self> {
-//         let mut vec = Vec::new();
-//         while buf.has_remaining() {
-//             let item = T::decode(buf)?;
-//             vec.push(item);
-//         }
-//         Ok(vec)
-//     }
-// }
-
 /// Encode an element to a buffer.
 pub trait Encode {
     /// Encode self to the buffer.

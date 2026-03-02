@@ -7,7 +7,6 @@ mod element; // Element body definitions and traits.
 mod error;
 mod frame;
 
-
 mod lacer;
 mod leaf; // Leaf elements in Matroska.
 mod master; // Master elements in Matroska.
@@ -16,7 +15,6 @@ mod supplement; // Supplementary elements in Matroska. Void elements, CRC-32, et
 use bytes::*;
 use coding::*;
 mod coding;
-
 
 // following modules are public
 pub mod io;

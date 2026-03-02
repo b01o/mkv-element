@@ -149,7 +149,7 @@ fn main() {
             .children()
             .find(|n| n.has_tag_name("documentation"))
             .and_then(|n| n.text())
-            .map(|t| format_doc(t))
+            .map(format_doc)
             .unwrap_or_else(|| format!("/// {raw_name} in ebml"));
 
         let name = adjust_name(raw_name);
