@@ -22,6 +22,7 @@ impl Element for {{ name }} {
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
         buf.put_slice(self.0.as_bytes());
+        buf.put_u8(0);
         Ok(())
     }
 {% if has_default %}

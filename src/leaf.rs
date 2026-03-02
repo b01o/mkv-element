@@ -117,19 +117,21 @@ mod tests {
             (vec![b'h', b'e', b'y', 0, b'w'], "hey"),
         ];
 
-        for (encoded, decoded) in test_pair {
-            let v = SegmentFilename::decode_body(&mut &*encoded).unwrap();
-            assert_eq!(v, SegmentFilename(decoded.to_string()));
+        for (input, output) in test_pair {
+            let v = SegmentFilename::decode_body(&mut &*input).unwrap();
+            assert_eq!(v, SegmentFilename(output.to_string()));
 
-            let mut buf = vec![];
-            SegmentFilename(decoded.to_string())
-                .encode_body(&mut buf)
+            let mut encoded = vec![];
+            SegmentFilename(output.to_string())
+                .encode_body(&mut encoded)
                 .unwrap();
-            if !encoded.contains(&0) {
-                assert_eq!(buf, encoded);
-            }
-            let new_decoded = SegmentFilename::decode_body(&mut &*buf).unwrap();
-            assert_eq!(new_decoded, SegmentFilename(decoded.to_string()));
+
+            assert_eq!(encoded[encoded.len() - 1], 0); // should be null-terminated
+            let input_zero_pos = input.iter().position(|&b| b == 0).unwrap_or(input.len());
+            assert_eq!(encoded[..input_zero_pos], input[..input_zero_pos]); // should encode
+
+            let new_decoded = SegmentFilename::decode_body(&mut &*encoded).unwrap();
+            assert_eq!(new_decoded, SegmentFilename(output.to_string()));
         }
     }
 
