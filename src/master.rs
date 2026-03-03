@@ -40,29 +40,25 @@ macro_rules! nested {
                             if [<$required:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                let mut body = &buf.chunk()[..body_size];
+                                let mut body = buf.copy_to_bytes(body_size);
                                 [<$required:snake>] = Some($required::decode_body(&mut body)?);
-                                buf.advance(body_size);
                             }
                         } )*
                         $( $optional::ID => {
                             if [<$optional:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                let mut body = &buf.chunk()[..body_size];
+                                let mut body = buf.copy_to_bytes(body_size);
                                 [<$optional:snake>] = Some($optional::decode_body(&mut body)?);
-                                buf.advance(body_size);
                             }
                         } )*
                         $( $multiple::ID => {
-                            let mut body = &buf.chunk()[..body_size];
+                            let mut body = buf.copy_to_bytes(body_size);
                             [<$multiple:snake>].push($multiple::decode_body(&mut body)?);
-                            buf.advance(body_size);
                         } )*
                         Void::ID => {
-                            let mut body = &buf.chunk()[..body_size];
+                            let mut body = buf.take(body_size);
                             let v = Void::decode_body(&mut body)?;
-                            buf.advance(body_size);
                             if let Some(previous) = void {
                                 void = Some(Void { size: previous.size + v.size });
                             } else {
@@ -338,9 +334,8 @@ impl Element for Cluster {
                             parent: Self::ID,
                         });
                     } else {
-                        let mut body = &buf.chunk()[..body_size];
+                        let mut body = buf.take(body_size);
                         timestamp = Some(Timestamp::decode_body(&mut body)?);
-                        buf.advance(body_size);
                     }
                 }
                 Position::ID => {
@@ -350,9 +345,8 @@ impl Element for Cluster {
                             parent: Self::ID,
                         });
                     } else {
-                        let mut body = &buf.chunk()[..body_size];
+                        let mut body = buf.take(body_size);
                         position = Some(Position::decode_body(&mut body)?);
-                        buf.advance(body_size);
                     }
                 }
                 PrevSize::ID => {
@@ -362,25 +356,21 @@ impl Element for Cluster {
                             parent: Self::ID,
                         });
                     } else {
-                        let mut body = &buf.chunk()[..body_size];
+                        let mut body = buf.take(body_size);
                         prev_size = Some(PrevSize::decode_body(&mut body)?);
-                        buf.advance(body_size);
                     }
                 }
                 SimpleBlock::ID => {
-                    let mut body = &buf.chunk()[..body_size];
+                    let mut body = buf.take(body_size);
                     blocks.push(SimpleBlock::decode_body(&mut body)?.into());
-                    buf.advance(body_size);
                 }
                 BlockGroup::ID => {
-                    let mut body = &buf.chunk()[..body_size];
+                    let mut body = buf.take(body_size);
                     blocks.push(BlockGroup::decode_body(&mut body)?.into());
-                    buf.advance(body_size);
                 }
                 Void::ID => {
-                    let mut body = &buf.chunk()[..body_size];
+                    let mut body = buf.take(body_size);
                     let v = Void::decode_body(&mut body)?;
-                    buf.advance(body_size);
                     if let Some(previous) = void {
                         void = Some(Void {
                             size: previous.size + v.size,

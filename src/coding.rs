@@ -13,8 +13,7 @@ impl<const N: usize> Decode for [u8; N] {
             return Err(Error::try_get_error(N, buf.remaining()));
         }
         let mut v = [0u8; N];
-        v.copy_from_slice(&buf.chunk()[..N]);
-        buf.advance(N);
+        buf.take(N).copy_to_slice(&mut v);
         Ok(v)
     }
 }

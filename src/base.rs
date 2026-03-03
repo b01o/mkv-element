@@ -227,12 +227,10 @@ impl Decode for VInt64 {
             }
             let mut bytes = [0u8; 8];
             let read_buf = &mut bytes[8 - leading_zeros..];
-            read_buf.copy_from_slice(&buf.chunk()[..leading_zeros]);
-
+            buf.take(leading_zeros).copy_to_slice(read_buf);
             if leading_zeros != 7 {
                 bytes[8 - leading_zeros - 1] = first_byte & (0xFF >> (leading_zeros + 1));
             }
-            buf.advance(leading_zeros);
             Ok(VInt64 {
                 value: u64::from_be_bytes(bytes),
                 is_unknown: false,

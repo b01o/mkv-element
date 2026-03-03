@@ -18,8 +18,7 @@ impl Element for {{ name }} {
         }
         let len = buf.remaining().min(8);
         let mut value = [0u8; 8];
-        value[8 - len..].copy_from_slice(&buf.chunk()[..len]);
-        buf.advance(len);
+        buf.take(len).copy_to_slice(&mut value[8 - len..]);
         Ok(Self(u64::from_be_bytes(value)))
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {

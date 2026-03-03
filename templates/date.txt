@@ -13,9 +13,7 @@ impl Element for {{ name }} {
         if buf.remaining() != 8 {
             return Err(crate::Error::UnderDecode(Self::ID));
         }
-        let result = i64::from_be_bytes(buf.chunk()[..8].try_into().unwrap());
-        buf.advance(8);
-        Ok(Self(result))
+        Ok(Self(buf.get_i64()))
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {
         buf.put_slice(&self.0.to_be_bytes());

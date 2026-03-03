@@ -27,7 +27,7 @@ impl<T: Element> Decode for T {
         if buf.remaining() < body_size {
             return Err(Error::try_get_error(body_size, buf.remaining()));
         }
-        let mut body = &buf.chunk()[..body_size];
+        let mut body = buf.take(body_size);
         let element = match T::decode_body(&mut body) {
             Ok(e) => e,
             Err(Error::TryGetError(_)) => return Err(Error::OverDecode(Self::ID)),
@@ -39,7 +39,6 @@ impl<T: Element> Decode for T {
             return Err(Error::UnderDecode(Self::ID));
         }
 
-        buf.advance(body_size);
         Ok(element)
     }
 }
