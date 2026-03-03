@@ -9,7 +9,7 @@ impl std::ops::Deref for {{ name }} {
 }
 impl Element for {{ name }} {
     const ID: VInt64 = VInt64::from_encoded({{ id }});
-    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self> {
         Ok(Self(buf.copy_to_bytes(buf.remaining())))
     }
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()> {

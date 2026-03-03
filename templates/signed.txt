@@ -9,7 +9,7 @@ impl std::ops::Deref for {{ name }} {
 }
 impl Element for {{ name }} {
     const ID: VInt64 = VInt64::from_encoded({{ id }});
-    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self> {
         if !buf.has_remaining() {
             return Ok(Self({{ default_value }}));
         }

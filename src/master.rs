@@ -18,7 +18,7 @@ nested! {
 macro_rules! nested {
     (required: [$($required:ident),*$(,)?], optional: [$($optional:ident),*$(,)?], multiple: [$($multiple:ident),*$(,)?],) => {
         paste::paste! {
-            fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+            fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self> {
                 let crc32 = if buf.remaining() > 6 && buf.chunk()[0] == 0xBF && buf.chunk()[1] == 0x84 {
                     Some(Crc32::decode(buf)?)
                 } else {
@@ -40,7 +40,7 @@ macro_rules! nested {
                             if [<$required:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                let mut body = buf.copy_to_bytes(body_size);
+                                let mut body = buf.take(body_size);
                                 [<$required:snake>] = Some($required::decode_body(&mut body)?);
                             }
                         } )*
@@ -48,12 +48,12 @@ macro_rules! nested {
                             if [<$optional:snake>].is_some() {
                                 return Err(Error::DuplicateElement { id: header.id, parent: Self::ID });
                             } else {
-                                let mut body = buf.copy_to_bytes(body_size);
+                                let mut body = buf.take(body_size);
                                 [<$optional:snake>] = Some($optional::decode_body(&mut body)?);
                             }
                         } )*
                         $( $multiple::ID => {
-                            let mut body = buf.copy_to_bytes(body_size);
+                            let mut body = buf.take(body_size);
                             [<$multiple:snake>].push($multiple::decode_body(&mut body)?);
                         } )*
                         Void::ID => {
@@ -307,7 +307,7 @@ pub struct Cluster {
 // Here we manually implement Element for Cluster, aggregating both SimpleBlock and BlockGroup into ClusterBlock, preserving their order.
 impl Element for Cluster {
     const ID: VInt64 = VInt64::from_encoded(0x1F43B675);
-    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self> {
         let crc32 = if buf.remaining() > 6 && buf.chunk()[0] == 0xBF && buf.chunk()[1] == 0x84 {
             Some(Crc32::decode(buf)?)
         } else {

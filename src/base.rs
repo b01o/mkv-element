@@ -203,7 +203,7 @@ impl crate::io::tokio_impl::AsyncReadFrom for VInt64 {
 }
 
 impl Decode for VInt64 {
-    fn decode<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode(buf: &mut dyn Buf) -> crate::Result<Self> {
         let first_byte = buf.try_get_u8()?;
         if first_byte == 0 {
             return Err(Error::InvalidVInt);
@@ -408,7 +408,7 @@ impl crate::io::tokio_impl::AsyncReadFrom for Header {
 }
 
 impl Decode for Header {
-    fn decode<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode(buf: &mut dyn Buf) -> crate::Result<Self> {
         let id = VInt64::decode(buf)?;
         let size = VInt64::decode(buf)?;
         Ok(Self { id, size })

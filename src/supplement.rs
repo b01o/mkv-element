@@ -19,7 +19,7 @@ pub struct Void {
 }
 impl Element for Void {
     const ID: VInt64 = VInt64::from_encoded(0xEC);
-    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self> {
         let len = buf.remaining();
         buf.advance(len);
         Ok(Self { size: len as u64 })
@@ -45,7 +45,7 @@ impl Deref for Crc32 {
 }
 impl Element for Crc32 {
     const ID: VInt64 = VInt64::from_encoded(0xBF);
-    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self> {
         let buf = <[u8; 4]>::decode(buf)?;
         Ok(Self(u32::from_le_bytes(buf)))
     }

@@ -4,11 +4,11 @@ use crate::*;
 /// Decode an element from a buffer.
 pub trait Decode: Sized {
     /// Decode an element from the buffer.
-    fn decode<B: Buf>(buf: &mut B) -> Result<Self>;
+    fn decode(buf: &mut dyn Buf) -> Result<Self>;
 }
 
 impl<const N: usize> Decode for [u8; N] {
-    fn decode<B: Buf>(buf: &mut B) -> Result<Self> {
+    fn decode(buf: &mut dyn Buf) -> Result<Self> {
         if buf.remaining() < N {
             return Err(Error::try_get_error(N, buf.remaining()));
         }

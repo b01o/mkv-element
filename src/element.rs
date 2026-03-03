@@ -14,14 +14,14 @@ pub trait Element: Sized {
     const HAS_DEFAULT_VALUE: bool = false;
 
     /// Decode the body of the element from a buffer.
-    fn decode_body<B: Buf>(buf: &mut B) -> crate::Result<Self>;
+    fn decode_body(buf: &mut dyn Buf) -> crate::Result<Self>;
 
     /// Encode the body of the element to a buffer.
     fn encode_body<B: BufMut>(&self, buf: &mut B) -> crate::Result<()>;
 }
 
 impl<T: Element> Decode for T {
-    fn decode<B: Buf>(buf: &mut B) -> crate::Result<Self> {
+    fn decode(buf: &mut dyn Buf) -> crate::Result<Self> {
         let header = Header::decode(buf)?;
         let body_size = *header.size as usize;
         if buf.remaining() < body_size {
