@@ -43,6 +43,29 @@ fn write_ebml() {
     assert_eq!(ebml, ebml_read);
 }
 
+#[test]
+fn test_signed_integer_preserve_sign_bit() {
+    // Encode
+    let dp = DiscardPadding(14833333_i64);
+    let mut buf = Vec::new();
+    dp.encode_body(&mut buf).unwrap();
+
+    // Decode
+    let mut b: &[u8] = &buf[..];
+    let decoded = DiscardPadding::decode_body(&mut b).unwrap();
+
+    assert_eq!(dp, decoded);
+    
+    // Also test negative for regressions
+    let dp_neg = DiscardPadding(-14833333_i64);
+    let mut buf_neg = Vec::new();
+    dp_neg.encode_body(&mut buf_neg).unwrap();
+    
+    let mut b_neg: &[u8] = &buf_neg[..];
+    let decoded_neg = DiscardPadding::decode_body(&mut b_neg).unwrap();
+    assert_eq!(dp_neg, decoded_neg);
+}
+
 #[cfg(feature = "tokio")]
 mod tokio_tests {
     use mkv_element::io::tokio_impl::*;
