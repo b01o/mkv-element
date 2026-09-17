@@ -100,9 +100,6 @@ impl VInt64 {
         if self.is_unknown {
             return 0xFF;
         }
-        if self.value == 127 {
-            return 0x407F;
-        }
 
         let size = VInt64::encode_size(self.value);
         let mut sbuf = [0u8; 8];
@@ -119,7 +116,15 @@ impl VInt64 {
         if total_bits == 0 {
             1
         } else {
-            (total_bits + 6).div_euclid(7)
+            let size = (total_bits + 6).div_euclid(7);
+            // The all-data-ones pattern is the reserved "unknown size"
+            // sentinel at every length (RFC 8794 §6.2), so a known value
+            // of 2^(7*size) - 1 must be encoded one byte wider.
+            if size < 8 && value == (1u64 << (7 * size)) - 1 {
+                size + 1
+            } else {
+                size
+            }
         }
     }
 }
@@ -245,10 +250,6 @@ impl Encode for VInt64 {
             buf.put_slice(&[0xFF]);
             return Ok(());
         }
-        if self.value == 127 {
-            buf.put_slice(&[0x40, 0x7F]);
-            return Ok(());
-        }
 
         let size = VInt64::encode_size(self.value);
         let mut sbuf = [0u8; 8];
@@ -272,10 +273,13 @@ mod tests {
             (vec![0b1000_0001], 1),
             (vec![0b0100_0000, 0xFF], 0xFF),
             (vec![0b0100_0001, 0xFF], 0b1_1111_1111),
-            (vec![0b0111_1111, 0xFF], 0b11_1111_1111_1111),
+            (vec![0b0010_0000, 0b0011_1111, 0xFF], 0b11_1111_1111_1111),
             (vec![0b0010_0000, 0b0111_1111, 0xFF], 0b111_1111_1111_1111),
             (vec![0b0010_0000, 0xFF, 0xFF], 0xFFFF),
-            (vec![0b0011_1111, 0xFF, 0xFF], 0b1_1111_1111_1111_1111_1111),
+            (
+                vec![0b0001_0000, 0b0001_1111, 0xFF, 0xFF],
+                0b1_1111_1111_1111_1111_1111,
+            ),
             (
                 vec![1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
                 0xFF_FFFF_FFFF_FFFF,
@@ -293,10 +297,13 @@ mod tests {
             (vec![0b1000_0001], 1),
             (vec![0b0100_0000, 0xFF], 0xFF),
             (vec![0b0100_0001, 0xFF], 0b1_1111_1111),
-            (vec![0b0111_1111, 0xFF], 0b11_1111_1111_1111),
+            (vec![0b0010_0000, 0b0011_1111, 0xFF], 0b11_1111_1111_1111),
             (vec![0b0010_0000, 0b0111_1111, 0xFF], 0b111_1111_1111_1111),
             (vec![0b0010_0000, 0xFF, 0xFF], 0xFFFF),
-            (vec![0b0011_1111, 0xFF, 0xFF], 0b1_1111_1111_1111_1111_1111),
+            (
+                vec![0b0001_0000, 0b0001_1111, 0xFF, 0xFF],
+                0b1_1111_1111_1111_1111_1111,
+            ),
             (
                 vec![1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
                 0xFF_FFFF_FFFF_FFFF,
